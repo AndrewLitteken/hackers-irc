@@ -1,4 +1,4 @@
-defmodule Elixirc.Applicaiton do
+defmodule Elixirc.Application do
 	use Application
 
 	def start(_type, _args) do

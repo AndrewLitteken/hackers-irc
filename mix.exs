@@ -15,7 +15,7 @@ defmodule Elixirc.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {Elixirc.Applicaiton, []}
+      mod: {Elixirc.Application, []}
     ]
   end
 
