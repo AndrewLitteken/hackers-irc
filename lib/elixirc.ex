@@ -16,10 +16,13 @@ defmodule Elixirc do
   end
 
   def serve(socket) do
-    with {:ok, data} <- :gen_tcp.recv(socket, 0) do
-          Logger.info(data)
-          serve(socket)
+    case :gen_tcp.recv(socket, 0) do
+      {:ok, data} -> 
+        Logger.info(data)
+      {:error, :closed} -> 
+        Logger.info("Socket Closed")
+        exit(:shutdown)
     end
-    Logger.info(["Connection on Socket has been closed"])
+    serve(socket)
   end
 end
