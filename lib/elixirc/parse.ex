@@ -1,7 +1,7 @@
 defmodule Elixirc.Task.MessageParser do
 
   def call(full_string \\ "") do
-    string_list = String.split(full_string, " ")
+    string_list = String.split(full_string)
     structure(string_list, 0)
   end
 
@@ -10,17 +10,17 @@ defmodule Elixirc.Task.MessageParser do
     map = structure(tail, 1)
     Map.put_new(map, :tags, tag_map)
   end
-  
+
   defp structure([_head | tail] = [":" <> rest | _ ], field) when field < 2 do
     map = structure(tail, 2)
     Map.put_new(map, :source, rest)
   end
-  
+
   defp structure([head | tail], field) when field < 3 do
     map = structure(tail, 3)
     Map.put_new(map, :command, head)
   end
-    
+
   defp structure(string_list, field) when field == 3 do
     %{:params => param_construct(string_list)}
   end
@@ -35,7 +35,7 @@ defmodule Elixirc.Task.MessageParser do
   defp param_construct([]) do
     []
   end
-  
+
   defp read_tags([head | tail]) do
     if String.contains?(head, "=") do
       pair = String.split(head, "=")
