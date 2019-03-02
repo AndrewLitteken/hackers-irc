@@ -19,6 +19,7 @@ defmodule Elixirc do
     case :gen_tcp.recv(socket, 0) do
       {:ok, data} -> 
         Logger.info(data)
+        #Logger.info(inspect(Elixirc.Task.MessageParser.call(data)))
       {:error, :closed} -> 
         Logger.info("Socket Closed")
         exit(:shutdown)
