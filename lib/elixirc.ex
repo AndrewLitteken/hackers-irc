@@ -1,6 +1,7 @@
 defmodule Elixirc do
   require Logger
 
+
   def run_server(port) do
     opts = [:binary, packet: :line, active: false, reuseaddr: true]
     {:ok, socket} = :gen_tcp.listen(6667, opts)
@@ -17,12 +18,34 @@ defmodule Elixirc do
 
   def serve(socket) do
     case :gen_tcp.recv(socket, 0) do
-      {:ok, data} -> 
+      {:ok, data} ->
         Logger.info(data)
-      {:error, :closed} -> 
+        if data == "NICK" do
+          # register user
+        end
+        data
+        |> process_message
+        |> write_line(socket)
+      {:error, :closed} ->
         Logger.info("Socket Closed")
         exit(:shutdown)
     end
     serve(socket)
+  end
+
+  defp process_message(data) do
+    [command | body] = String.split(data)
+    case command do
+      "PING" -> pong(hd(body))
+      _ -> "TEST"
+    end
+  end
+
+  defp pong(body) do
+    ":elixIRC PONG elixIRC :" <> body
+  end
+
+  defp write_line(line, socket) do
+    :gen_tcp.send(socket, line <> "\r\n")
   end
 end
