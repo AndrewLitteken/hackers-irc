@@ -19,8 +19,8 @@ defmodule Elixirc do
   def serve(socket) do
     case :gen_tcp.recv(socket, 0) do
       {:ok, data} ->
-        #Logger.info(data)
-        #Logger.info(inspect(Elixirc.Task.MessageParser.call(data)))
+        Logger.info(data)
+        Logger.info(inspect(Elixirc.Task.MessageParser.call(data)))
         if data == "NICK" do
           # register user
         end
@@ -35,9 +35,12 @@ defmodule Elixirc do
   end
 
   defp process_message(data) do
-    [command | body] = String.split(data)
-    case command do
-      "PING" -> pong(hd(body))
+    mapping = Elixirc.Task.MessageParser.call(data)
+    #[command | body] = String.split(data)
+    #case command do
+    case mapping[:command] do
+    "PING" -> pong(List.to_string(mapping[:params]))
+    #"PING" -> pong(hd(body))
       _ -> "TEST"
     end
   end

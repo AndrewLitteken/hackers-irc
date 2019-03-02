@@ -22,9 +22,20 @@ defmodule Elixirc.Task.MessageParser do
   end
     
   defp structure(string_list, field) when field == 3 do
-    %{:params => string_list}
+    %{:params => param_construct(string_list)}
   end
 
+  defp param_construct([head | tail]) do
+    case head do
+      ":" <> rest -> [Enum.join([rest] ++ tail, " ")]
+      _ -> [head] ++ param_construct(tail)
+    end
+  end
+
+  defp param_construct([]) do
+    []
+  end
+  
   defp read_tags([head | tail]) do
     if String.contains?(head, "=") do
       pair = String.split(head, "=")
