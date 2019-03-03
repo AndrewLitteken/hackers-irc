@@ -5,7 +5,10 @@ defmodule Elixirc.Application do
 		#List Children and Start them here
 		children = [
 			{Task.Supervisor, name: Elixirc.TaskSupervisor},
-			Supervisor.child_spec({Task, fn -> Elixirc.run_server(6667) end}, restart: :permanent)
+			{DynamicSupervisor, name: Elixirc.ConnectionsSupervisor, strategy: :one_for_one},
+			{Registry, keys: :unique, name: Registry.Connections},
+			{Registry, keys: :duplicate, name: Registry.Channels},
+			Supervisor.child_spec({Task, fn -> Elixirc.run_server(6667) end}, restart: :permanent),
 		]
 
 		opts = [strategy: :one_for_one, name: Elixirc.Supervisor]

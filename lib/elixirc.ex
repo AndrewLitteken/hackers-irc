@@ -11,49 +11,70 @@ defmodule Elixirc do
 
   defp loopaccecpt(socket) do
     {:ok, client} = :gen_tcp.accept(socket)
-    {:ok, pid} = Task.Supervisor.start_child(Elixirc.TaskSupervisor, fn -> Elixirc.connect(client) end)
+    {:ok, pid} = Task.Supervisor.start_child(Elixirc.TaskSupervisor, fn -> Elixirc.serve(client) end)
     :ok = :gen_tcp.controlling_process(client, pid)
     loopaccecpt(socket)
   end
 
-  def connect(socket) do
-    {:ok, useragent} = Agent.start_link fn -> %{user: "", nick: "", realname: "", channels: []} end
-    serve(socket, useragent)
-  end
-
-  def serve(socket, useragent) do
-    case :gen_tcp.recv(socket, 0) do
+  def serve(socket, nick \\ "") do
+    nick = case :gen_tcp.recv(socket, 0) do
       {:ok, data} ->
-        # Logger.info(data)
-        data
-        |> process_message(useragent)
-        |> write_lines(socket, useragent)
+        {nick, lines} = process_message(data, nick)
+        name = {:via, Registry, {Registry.Connections, nick}}
+        write_lines(lines, socket, name)
+        nick
       {:error, :closed} ->
+        if String.length(nick) != 0 do
+          Elixirc.Connections.close({:via, Registry, {Registry.Connections, nick}})
+        end
         Logger.info("Socket Closed")
-        Agent.stop(useragent)
+        exit(:shutdown)
+      {:error, error} ->
+        if String.length(nick) != 0 do
+          Elixirc.Connections.close({:via, Registry, {Registry.Connections, nick}})
+        end
+        Logger.info(["Socket Crashed with exit code ", inspect(error)])
         exit(:shutdown)
     end
-    serve(socket, useragent)
+    Logger.info("Nick is now #{nick}")
+    serve(socket, nick)
   end
 
-  defp process_message(data, useragent) do
+  defp process_message(data, nick) do
     mapping = Elixirc.Task.MessageParser.call(data)
-
     case mapping[:command] do
     "NICK" ->
-      update_user(useragent, :nick, hd(mapping[:params]))
-      []
+      [key | _tail] = mapping[:params]
+      if String.length(nick) != 0 do
+        Registry.lookup(Registry.Connections, key)
+        |> case do
+          [{_pid, nil}] -> {nick, response_nickclash(key)}
+          _ -> 
+            Elixirc.Connections.change_nic({:via, Registry, {Registry.Connections, nick}}, key)
+            {key, []}
+        end
+      else
+        name = {:via, Registry, {Registry.Connections, key}}
+        DynamicSupervisor.start_child(Elixirc.ConnectionsSupervisor, Elixirc.Connections.child_spec(name: name))
+        |> case do
+          {:ok, _pid} -> 
+            Elixirc.Connections.put(name, :nick, key)
+            Logger.info("Got here")
+            {key, []}
+          {:error, {:already_started, _pid}} -> {nick, response_nickclash(key)}
+        end
+      end
     "USER" ->
-      update_user(useragent, :user, hd(mapping[:params]))
-      update_user(useragent, :realname, List.last(mapping[:params]))
-      response_registration()
+      [head|tail] = mapping[:params]
+      name = {:via, Registry, {Registry.Connections, nick}}
+      Elixirc.Connections.put(name, :user, head)
+      Elixirc.Connections.put(name, :realname, List.last(tail))
+      {nick, response_registration()}
     "PING" -> pong(hd(mapping[:params]))
-      _ -> []
+      cmd -> 
+        Logger.info("Command #{cmd} Not Handled")
+        {nick,[]}
     end
-  end
-
-  defp update_user(useragent, field, value) do
-    Agent.update(useragent, fn state -> %{state | field => value} end)
   end
 
   defp response_registration() do
@@ -79,14 +100,25 @@ defmodule Elixirc do
     ]
   end
 
+  defp response_nickclash(key) do
+    [
+      "436 #{key} :#{key} already in use"
+    ]
+  end
+
   defp pong(body) do
     ["PONG elixIRC :" <> body]
   end
 
-  defp write_lines(lines, socket, useragent) do
-    nick = Agent.get(useragent, fn state -> state[:nick] end)
-    lines
-    |> Enum.map(fn x -> String.replace(x, "<nick>", nick) end)
-    |> Enum.each(fn x -> :gen_tcp.send(socket, ":elixIRC " <> x <> "\r\n") end)
+  defp write_lines(lines, socket, name) do
+    {:via, Registry, {Registry.Connections, nick}} = name
+    if String.length(nick) == 0 do
+        lines
+        |> Enum.each(fn x -> :gen_tcp.send(socket, ":elixIRC "<>x<>"\r\n") end)
+      else
+        lines
+        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) end)
+        |> Enum.each(fn x -> :gen_tcp.send(socket, ":elixIRC " <> x <> "\r\n") end)
+    end 
   end
 end
