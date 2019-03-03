@@ -36,7 +36,6 @@ defmodule Elixirc do
         Logger.info(["Socket Crashed with exit code ", inspect(error)])
         exit(:shutdown)
     end
-    Logger.info("Nick is now #{nick}")
     serve(socket, nick)
   end
 
