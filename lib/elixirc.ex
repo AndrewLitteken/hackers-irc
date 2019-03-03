@@ -19,9 +19,9 @@ defmodule Elixirc do
   def serve(socket, nick \\ "") do
     nick = case :gen_tcp.recv(socket, 0) do
       {:ok, data} ->
-        {nick, lines} = process_message(data, nick)
+        {nick, lines, source} = process_message(data, nick, socket)
         name = {:via, Registry, {Registry.Connections, nick}}
-        write_lines(lines, socket, name)
+        write_lines(lines, socket, name, source)
         nick
       {:error, :closed} ->
         if String.length(nick) != 0 do
@@ -39,41 +39,52 @@ defmodule Elixirc do
     serve(socket, nick)
   end
 
-  defp process_message(data, nick) do
+  defp process_message(data, nick, socket) do
     mapping = Elixirc.Task.MessageParser.call(data)
     case mapping[:command] do
-    "NICK" ->
-      [key | _tail] = mapping[:params]
-      if String.length(nick) != 0 do
-        Registry.lookup(Registry.Connections, key)
-        |> case do
-          [{_pid, nil}] -> {nick, response_nickclash(key)}
-          _ -> 
-            Elixirc.Connections.change_nic({:via, Registry, {Registry.Connections, nick}}, key)
-            {key, []}
-        end
-      else
-        name = {:via, Registry, {Registry.Connections, key}}
-        DynamicSupervisor.start_child(Elixirc.ConnectionsSupervisor, Elixirc.Connections.child_spec(name: name))
-        |> case do
-          {:ok, _pid} -> 
-            Elixirc.Connections.put(name, :nick, key)
-            Logger.info("Got here")
-            {key, []}
-          {:error, {:already_started, _pid}} -> {nick, response_nickclash(key)}
-        end
-      end
-    "USER" ->
-      [head|tail] = mapping[:params]
-      name = {:via, Registry, {Registry.Connections, nick}}
-      Elixirc.Connections.put(name, :user, head)
-      Elixirc.Connections.put(name, :realname, List.last(tail))
-      {nick, response_registration()}
-    "PING" -> pong(hd(mapping[:params]))
+      "NICK" ->
+        [key|_tail] = mapping[:params]
+        hostname = List.to_string(resolve_hostname(socket))
+        Logger.info("Hostname is #{hostname}")
+        handle_nick(key, nick, hostname)
+      "USER" ->
+        [head|tail] = mapping[:params]
+        handle_user(nick, head, List.last(tail))
+      "PING" -> {nick, pong(hd(mapping[:params])), "elixIRC"}
+      "FAIL" -> 1 + []
       cmd -> 
         Logger.info("Command #{cmd} Not Handled")
-        {nick,[]}
+        {nick,[], "elixIRC"}
     end
+  end
+
+  defp handle_nick(new_nick, old_nick, hostname) do
+    if String.length(old_nick) != 0 do
+      Registry.lookup(Registry.Connections, new_nick)
+      |> case do
+        [{_pid, nil}] -> {old_nick, response_nickclash(new_nick), "elixIRC"}
+        _ -> 
+          Elixirc.Connections.change_nic({:via, Registry, {Registry.Connections, old_nick}}, new_nick)
+          {new_nick, ["NICK :#{new_nick}"], "#{old_nick}!<user>@<hostname>"}
+      end
+    else
+      name = {:via, Registry, {Registry.Connections, new_nick}}
+      DynamicSupervisor.start_child(Elixirc.ConnectionsSupervisor, Elixirc.Connections.child_spec(name: name))
+      |> case do
+        {:ok, _pid} -> 
+          Elixirc.Connections.put(name, :nick, new_nick)
+          Elixirc.Connections.put(name, :host, hostname)
+          {new_nick, [], "elixIRC"}
+        {:error, {:already_started, _pid}} -> {old_nick, response_nickclash(new_nick), "elixIRC"}
+      end
+    end 
+  end
+
+  defp handle_user(nick, username, realname) do
+    name = {:via, Registry, {Registry.Connections, nick}}
+    Elixirc.Connections.put(name, :user, "~"<>username)
+    Elixirc.Connections.put(name, :realname, realname)
+    {nick, response_registration(), "elixIRC"}
   end
 
   defp response_registration() do
@@ -101,7 +112,7 @@ defmodule Elixirc do
 
   defp response_nickclash(key) do
     [
-      "436 #{key} :#{key} already in use"
+      "433 * #{key} :Nickname already in use"
     ]
   end
 
@@ -109,15 +120,29 @@ defmodule Elixirc do
     ["PONG elixIRC :" <> body]
   end
 
-  defp write_lines(lines, socket, name) do
+  defp resolve_hostname(client) do
+    {:ok, {ip, _port}} = :inet.peername(client)
+    case :inet.gethostbyaddr(ip) do
+      {:ok, {:hostent, hostname, _, _, _, _}} ->
+        hostname
+      {:error, _error} ->
+        Logger.info("Falling back to ip address")
+        Enum.join(Tuple.to_list(ip), ".")
+    end
+  end
+
+  defp write_lines(lines, socket, name, source) do
     {:via, Registry, {Registry.Connections, nick}} = name
     if String.length(nick) == 0 do
         lines
-        |> Enum.each(fn x -> :gen_tcp.send(socket, ":elixIRC "<>x<>"\r\n") end)
+        |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end)
       else
+        source = String.replace(source, "<user>", Elixirc.Connections.get(name, :user))
+        source = String.replace(source, "<hostname>", Elixirc.Connections.get(name, :host))
+        source = String.replace(source, "<nick>", Elixirc.Connections.get(name, :nick))
         lines
         |> Enum.map(fn x -> String.replace(x, "<nick>", nick) end)
-        |> Enum.each(fn x -> :gen_tcp.send(socket, ":elixIRC " <> x <> "\r\n") end)
+        |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end)
     end 
   end
 end
