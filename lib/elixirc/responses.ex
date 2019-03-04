@@ -43,4 +43,10 @@ defmodule Elixirc.Responses do
   		"ERROR :Closing Link: <hostname> (Client Quit)"
   	]
   end
+
+  def response_unknown(cmd) do
+  	[
+  		"421 <nick> #{cmd} :Unknown Command"
+  	]
+  end
 end

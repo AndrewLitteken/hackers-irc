@@ -71,4 +71,8 @@ defmodule Elixirc.Commands do
   	exit(:shutdown)
   end
 
+  def handle_unknown(nick, cmd) do
+  	{nick, Responses.response_unknown(cmd), "elixIRC"}
+  end
+
 end

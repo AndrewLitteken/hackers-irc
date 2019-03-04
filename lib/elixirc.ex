@@ -51,13 +51,16 @@ defmodule Elixirc do
         Commands.handle_user(nick, head, List.last(tail))
       "PING" -> {nick, Commands.pong(hd(mapping[:params])), "elixIRC"}
       "PONG" ->
-        Logger.info("Received Pong from Client - Doing nothing about this at the moment")
+        Logger.info("Received PONG from Client - Doing nothing about this at the moment")
         {nick, [], "elixIRC"}
       "FAIL" -> 1 + []
+      "PASS" -> 
+        Logger.info("Received PASS from Client - Ignoring for now")
+        {nick, [], "elixIRC"}
       "QUIT" -> Commands.handle_quit(nick, socket)
       cmd -> 
         Logger.info("Command #{cmd} Not Handled")
-        {nick,[], "elixIRC"}
+        Commands.handle_unknown(nick, cmd)
     end
   end
 
