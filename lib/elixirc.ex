@@ -58,33 +58,56 @@ defmodule Elixirc do
     end
   end
 
-  defp handle_nick(new_nick, old_nick, hostname) do
-    if String.length(old_nick) != 0 do
-      Registry.lookup(Registry.Connections, new_nick)
-      |> case do
-        [{_pid, nil}] -> {old_nick, response_nickclash(new_nick), "elixIRC"}
-        _ -> 
-          Elixirc.Connections.change_nic({:via, Registry, {Registry.Connections, old_nick}}, new_nick)
+  defp handle_nick(new_nick, "" = _old_nick, hostname) do
+    name = {:via, Registry, {Registry.Connections, new_nick}}
+    Elixirc.Connections.start_link([name: name])
+    |> case do
+      {:ok, _pid} -> 
+        Elixirc.Connections.put(name, :nick, new_nick)
+        Elixirc.Connections.put(name, :host, hostname)
+        {new_nick, [], "elixIRC"}
+      {:error, {:already_started, _pid}} -> {"", response_nickclash(new_nick), "elixIRC"}
+    end
+  end
+
+  defp handle_nick(new_nick, old_nick, _hostname) do
+    Registry.lookup(Registry.Connections, new_nick)
+    |> case do
+      [{_pid, nil}] -> {old_nick, response_nickclash(new_nick), "elixIRC"}
+      _ -> 
+        Elixirc.Connections.change_nic({:via, Registry, {Registry.Connections, old_nick}}, new_nick)
+        if (Elixirc.Connections.get({:via, Registry, {Registry.Connections, new_nick}}, :registered) == true) do
           {new_nick, ["NICK :#{new_nick}"], "#{old_nick}!<user>@<hostname>"}
-      end
-    else
-      name = {:via, Registry, {Registry.Connections, new_nick}}
-      DynamicSupervisor.start_child(Elixirc.ConnectionsSupervisor, Elixirc.Connections.child_spec(name: name))
-      |> case do
-        {:ok, _pid} -> 
-          Elixirc.Connections.put(name, :nick, new_nick)
-          Elixirc.Connections.put(name, :host, hostname)
-          {new_nick, [], "elixIRC"}
-        {:error, {:already_started, _pid}} -> {old_nick, response_nickclash(new_nick), "elixIRC"}
-      end
-    end 
+        else
+          Elixirc.Connections.put({:via, Registry, {Registry.Connections, new_nick}}, :registered, true)
+          {new_nick, response_registration(), "elixIRC"}
+        end
+    end
+  end
+
+  defp handle_user("" = _nick, username, realname) do
+    temp_nick = generate_good_nick()
+    name = {:via, Registry, {Registry.Connections, temp_nick}}
+    {:ok, _pid} = Elixirc.Connections.start_link([name: name])
+    Elixirc.Connections.put(name, :user, "~"<>username)
+    Elixirc.Connections.put(name, :realname, realname)
+    {temp_nick, [], "elixIRC"}
   end
 
   defp handle_user(nick, username, realname) do
     name = {:via, Registry, {Registry.Connections, nick}}
     Elixirc.Connections.put(name, :user, "~"<>username)
     Elixirc.Connections.put(name, :realname, realname)
+    Elixirc.Connections.put(name, :registered, true)
     {nick, response_registration(), "elixIRC"}
+  end
+
+  defp generate_good_nick() do
+    temp_nick = Elixirc.Randstring.randomizer(20, :downcase)
+    case Registry.lookup(Registry.Connections, temp_nick) do
+      {:ok, _pid} -> generate_good_nick()
+      _ -> temp_nick
+    end
   end
 
   defp response_registration() do
@@ -131,18 +154,17 @@ defmodule Elixirc do
     end
   end
 
-  defp write_lines(lines, socket, name, source) do
-    {:via, Registry, {Registry.Connections, nick}} = name
-    if String.length(nick) == 0 do
-        lines
-        |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end)
-      else
-        source = String.replace(source, "<user>", Elixirc.Connections.get(name, :user))
-        source = String.replace(source, "<hostname>", Elixirc.Connections.get(name, :host))
-        source = String.replace(source, "<nick>", Elixirc.Connections.get(name, :nick))
-        lines
-        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) end)
-        |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end)
-    end 
+  defp write_lines(lines, socket, {:via, Registry, {Registry.Connections, ""}} = _name, source) do
+    lines
+    |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end)
+  end
+
+  defp write_lines(lines, socket, {:via, Registry, {Registry.Connections, nick}} = name, source) do
+      source = String.replace(source, "<user>", Elixirc.Connections.get(name, :user))
+      source = String.replace(source, "<hostname>", Elixirc.Connections.get(name, :host))
+      source = String.replace(source, "<nick>", Elixirc.Connections.get(name, :nick))
+      lines
+      |> Enum.map(fn x -> String.replace(x, "<nick>", nick) end)
+      |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end) 
   end
 end
