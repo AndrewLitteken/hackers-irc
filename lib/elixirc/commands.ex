@@ -57,4 +57,18 @@ defmodule Elixirc.Commands do
     ["PONG elixIRC :" <> body]
   end
 
+  def handle_quit("", socket) do
+  	name = {:via, Registry, {Registry.Connections, ""}}
+  	Elixirc.write_lines(Responses.response_quit(), socket, name, "")
+  	exit(:shutdown)
+  end
+  
+  def handle_quit(nick, socket) do
+  	name = {:via, Registry, {Registry.Connections, nick}}
+  	Elixirc.write_lines(Responses.message_quit(), socket, name, "<nick>!<user>@<hostname>")
+  	Elixirc.write_lines(Responses.response_quit(), socket, name, "")
+  	Elixirc.Connections.close(name)
+  	exit(:shutdown)
+  end
+
 end

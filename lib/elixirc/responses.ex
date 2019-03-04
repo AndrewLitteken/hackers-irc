@@ -31,4 +31,16 @@ defmodule Elixirc.Responses do
       "433 * #{key} :Nickname already in use"
     ]
   end
+
+  def message_quit() do
+  	[
+  		"QUIT :Client Quit"
+  	]
+  end
+
+  def response_quit() do
+  	[
+  		"ERROR :Closing Link: <hostname> (Client Quit)"
+  	]
+  end
 end

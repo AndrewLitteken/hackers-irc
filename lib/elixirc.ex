@@ -50,7 +50,11 @@ defmodule Elixirc do
         [head|tail] = mapping[:params]
         Commands.handle_user(nick, head, List.last(tail))
       "PING" -> {nick, Commands.pong(hd(mapping[:params])), "elixIRC"}
+      "PONG" ->
+        Logger.info("Received Pong from Client - Doing nothing about this at the moment")
+        {nick, [], "elixIRC"}
       "FAIL" -> 1 + []
+      "QUIT" -> Commands.handle_quit(nick, socket)
       cmd -> 
         Logger.info("Command #{cmd} Not Handled")
         {nick,[], "elixIRC"}
@@ -68,17 +72,24 @@ defmodule Elixirc do
     end
   end
 
-  defp write_lines(lines, socket, {:via, Registry, {Registry.Connections, ""}} = _name, source) do
-    lines
-    |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end)
+  def write_lines(lines, socket, {:via, Registry, {Registry.Connections, ""}} = _name, source) do
+    cond do
+      source == "" -> lines |> Enum.each(fn x -> :gen_tcp.send(socket, x<>"\r\n") end)
+      true -> lines |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end)
+    end
   end
 
-  defp write_lines(lines, socket, {:via, Registry, {Registry.Connections, nick}} = name, source) do
-      source = String.replace(source, "<user>", Elixirc.Connections.get(name, :user))
-      source = String.replace(source, "<hostname>", Elixirc.Connections.get(name, :host))
-      source = String.replace(source, "<nick>", Elixirc.Connections.get(name, :nick))
-      lines
-      |> Enum.map(fn x -> String.replace(x, "<nick>", nick) end)
-      |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end) 
+  def write_lines(lines, socket, {:via, Registry, {Registry.Connections, nick}} = name, source) do
+    source = String.replace(source, "<user>", Elixirc.Connections.get(name, :user)) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) |> String.replace("<nick>", Elixirc.Connections.get(name, :nick))
+    cond do
+      source == "" -> 
+        lines 
+        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) end) 
+        |> Enum.each(fn x -> :gen_tcp.send(socket, x<>"\r\n") end)
+      true -> 
+        lines
+        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) end)
+        |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end) 
+    end
   end
 end
