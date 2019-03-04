@@ -1,7 +1,7 @@
 defmodule Elixirc do
   require Logger
   alias Elixirc.Commands, as: Commands
-  
+
   def run_server(port) do
     opts = [:binary, packet: :line, active: false, reuseaddr: true]
     {:ok, socket} = :gen_tcp.listen(6667, opts)
@@ -41,11 +41,18 @@ defmodule Elixirc do
 
   defp process_message(data, nick, socket) do
     mapping = Elixirc.Task.MessageParser.call(data)
+    Logger.info(inspect(mapping))
     case mapping[:command] do
       "NICK" ->
-        [key|_tail] = mapping[:params]
-        hostname = List.to_string(resolve_hostname(socket))
-        Commands.handle_nick(key, nick, hostname)
+        result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^[^ :,]+$"}]
+        case result do
+          {:ok, _} ->
+            [key|_tail] = mapping[:params]
+            hostname = List.to_string(resolve_hostname(socket))
+            Commands.handle_nick(key, nick, hostname)
+          {:error, _}  ->
+            {"", Elixirc.Responses.response_nickspec(mapping[:params]), "elixIRC"}
+        end
       "USER" ->
         [head|tail] = mapping[:params]
         Commands.handle_user(nick, head, List.last(tail))

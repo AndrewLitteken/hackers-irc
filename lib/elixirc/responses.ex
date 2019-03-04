@@ -49,4 +49,14 @@ defmodule Elixirc.Responses do
   		"421 <nick> #{cmd} :Unknown Command"
   	]
   end
+
+  def response_nickspec(params) do
+    case params do
+      ["" | _ ] -> 
+        [ "431 <nick> :No nickname given"]
+      _ -> 
+        [ "432 <nick> :Erroneus nickname" ]
+    end 
+  end
+
 end
