@@ -2,7 +2,7 @@ defmodule Elixirc.Connections do
 	use Agent, restart: :temporary
 	require Logger
 
-	defstruct user: "", host: "", nick: "", realname: "", channels: []
+	defstruct registered: false, user: "", host: "", nick: "", realname: "", channels: {}
 
 	@doc"""
   	Starts the Connections Agent
@@ -32,7 +32,7 @@ defmodule Elixirc.Connections do
 				{:ok, _} -> 
 					Registry.unregister(Registry.Connections, Map.get(x, :nick))
 					Map.put(x, :nick, nick)
-				{:error, {:already_registered, pid}} ->
+				{:error, {:already_registered, _pid}} ->
 					x
 			end
 		end)
