@@ -12,6 +12,17 @@ defmodule Elixirc.Validate do
         {:error, "parameter and specification mismatch"}
     end
   end
+
+  defp check_param([] = param, [head | tail] = _spec) do
+    case head do
+      {:option, _} -> check_param(param, tail)
+      _ -> {:error, "parameter and specification mismatch"}
+    end
+  end
+
+   defp check_param([_head | _tail] = _param, [] = _spec) do
+     {:error, "parameter and specification mismatch"}
+  end
   
     defp check_param([param_head | param_tail] = param, [spec_head | spec_tail] = spec) do
       Logger.info(inspect(spec_head))
