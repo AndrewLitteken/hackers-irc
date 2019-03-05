@@ -1,4 +1,5 @@
 defmodule Elixirc.Task.MessageParser do
+  require Logger
 
   def call(full_string \\ "") do
     string_list = String.split(full_string)

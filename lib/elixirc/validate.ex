@@ -1,16 +1,19 @@
-defmodule Elixirc.Task.Validate do
+defmodule Elixirc.Validate do
+  require Logger
 
-  def call(params, param_specs) do
+  def validate(params, param_specs) do
     check_param(params, param_specs)
   end
 
-  defp check_param([param_head | param_tail] = param, [spec_head | spec_tail] = spec) do
-    if (param == [] or spec == []) and param != spec do
-        {:error, "parameters do not match specification"}
-    end
-    if param == [] and spec == [] do
-        {:ok, nil} 
+  defp check_param([] = param, [] = spec) do
+    if param == spec do
+        {:ok, nil}
     else
+        {:error, "parameter and specification mismatch"}
+    end
+  end
+  
+    defp check_param([param_head | param_tail] = param, [spec_head | spec_tail] = spec) do
       result = case spec_head do
         {:matches, string} ->
           if string == param_head do
@@ -24,7 +27,7 @@ defmodule Elixirc.Task.Validate do
             _ -> {:error, param_head<>"does not start with "<>string}
           end
         {:pattern, string} ->
-          test = Regex.compile(string)
+          {:ok, test} = Regex.compile(string)
           case Regex.match?(test, param_head) do
             true -> {:ok, nil}
             false -> {:error, "pattern does match for "<>param_head}
@@ -37,12 +40,13 @@ defmodule Elixirc.Task.Validate do
             _ -> check_param(param, spec_tail)
           end
       end 
-      case result do
+      ret = case result do
         {:ok, _} -> check_param(param_tail, spec_tail)
-        _ -> result 
+        {:error, _} -> {:error, "parameter mismatch"}
       end
-    end
+      ret
   end
+  
 
   defp check_multiple(param, [spec_head | spec_tail]) do
     case check_param([param], [spec_head]) do
@@ -54,5 +58,6 @@ defmodule Elixirc.Task.Validate do
   defp check_multiple(param, []) do
     {:error, param<>" does not match given specification"}
   end
+
 
 end
