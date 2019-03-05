@@ -31,8 +31,8 @@ defmodule Elixirc do
         end
         Logger.info("Socket Closed")
         exit(:shutdown)
-      {:outgoing, data} ->
-        :gen_tcp.send(socket, data)
+      {:outgoing, data, source} ->
+        write_message(data, socket, source)
         nick
       {:error, error} ->
         if String.length(nick) != 0 do
@@ -121,6 +121,10 @@ defmodule Elixirc do
     end
   end
 
+  def write_message(data, socket, source) do
+    :gen_tcp.send(socket, ":"<>source<>" "<>data<>"\r\n")
+  end
+
   def write_lines(lines, socket, {:via, Registry, {Registry.Connections, ""}} = _name, source) do
     cond do
       source == "" -> lines |> Enum.each(fn x -> :gen_tcp.send(socket, x<>"\r\n") end)
@@ -133,11 +137,11 @@ defmodule Elixirc do
     cond do
       source == "" ->
         lines
-        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) end)
+        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) |> String.replace("<user>", Elixirc.Connections.get(name, :user)) end)
         |> Enum.each(fn x -> :gen_tcp.send(socket, x<>"\r\n") end)
       true ->
         lines
-        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) end)
+        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) |> String.replace("<user>", Elixirc.Connections.get(name, :user)) end)
         |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end)
     end
   end

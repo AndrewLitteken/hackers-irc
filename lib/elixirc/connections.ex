@@ -39,7 +39,8 @@ defmodule Elixirc.Connections do
 		end)
 	end
 
-	def change_user_mode(connection, modestring, op \\ "add") when modestring != "" do
+	def change_user_mode(connection, modestring, op \\ "add")
+	def change_user_mode(connection, modestring, op) when modestring != "" do
 		case modestring do
 			"+"<>rest ->
 				change_user_mode(connection, rest, "add")
