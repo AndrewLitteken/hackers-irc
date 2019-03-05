@@ -59,7 +59,7 @@ defmodule Elixirc do
             {nick, Elixirc.Responses.response_nickspec(mapping[:params]), "elixIRC"}
         end
       "USER" ->
-         result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^[^ :,]+$"}, {:matches, "0"}, {:matches, "*"}, {:pattern, "^[^:,]+$"}]
+         result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^[^ :,]+$"}, {:pattern, ".*"}, {:pattern, ".*"}, {:pattern, "^[^:,]+$"}]
          case result do
            {:ok, _} ->
              [head|tail] = mapping[:params]
@@ -128,11 +128,11 @@ defmodule Elixirc do
     cond do
       source == "" ->
         lines
-        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) end)
+        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) |> String.replace("<user>", Elixirc.Connections.get(name, :user)) end)
         |> Enum.each(fn x -> :gen_tcp.send(socket, x<>"\r\n") end)
       true ->
         lines
-        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) end)
+        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) |> String.replace("<user>", Elixirc.Connections.get(name, :user)) end)
         |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end)
     end
   end
