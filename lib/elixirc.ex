@@ -59,7 +59,7 @@ defmodule Elixirc do
             {nick, Elixirc.Responses.response_nickspec(mapping[:params]), "elixIRC"}
         end
       "USER" ->
-         result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^[^ :,]+$"}, {:matches, "0"}, {:matches, "*"}, {:pattern, "^[^:,]+$"}]
+         result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^[^ :,]+$"}, {:pattern, ".*"}, {:pattern, ".*"}, {:pattern, "^[^:,]+$"}]
          case result do
            {:ok, _} ->
              [head|tail] = mapping[:params]
