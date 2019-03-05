@@ -46,7 +46,6 @@ defmodule Elixirc.Connections do
 				change_user_mode(connection, rest, "sub")
 			nil ->
 				tuple = Agent.get(connection, &Map.get(&1, :modes))
-				Logger.info(inspect(tuple))
 				{:return, List.to_string(Tuple.to_list(tuple))}
 			_ ->
 				case op do
@@ -65,9 +64,10 @@ defmodule Elixirc.Connections do
 						tuple = Agent.get(connection, &Map.get(&1, :modes))
 						tuple_string = List.to_string(Tuple.to_list(tuple))
 						char = String.at(modestring, 0)
-						if String.contains?(tuple_string, char) do
-							for i <- tuple_size(tuple)-1..0, elem(tuple, i) == char, do: Tuple.delete_at(tuple, i)
+						i = if String.contains?(tuple_string, char) do
+							Enum.find_index(Tuple.to_list(tuple), fn x -> x == char end)
 						end
+						tuple = Tuple.delete_at(tuple, i)
 						Agent.update(connection, &Map.put(&1, :modes, tuple))
 				end
 				change_user_mode(connection, String.slice(modestring, 1, String.length(modestring)))

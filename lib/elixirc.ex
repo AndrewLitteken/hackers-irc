@@ -67,13 +67,14 @@ defmodule Elixirc do
         Logger.info("Received PONG from Client - Doing nothing about this at the moment")
         {nick, [], "elixIRC"}
       "MODE" ->
-        result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^[^ :,]+$"}, {:option, {:pattern, "(\+|\-)[a-zA-z]+"}}]
+        result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^(#)?[^ :,]+$"}, {:option, {:pattern, "^(\\+|\\-)[a-zA-Z]+$"}}]
         case result do
           {:ok, _} ->
             [head|tail] = mapping[:params]
             Commands.handle_mode(nick, head, List.first(tail))
           {:error, _} ->
-            {"", Elixirc.Responses.response_modespec(mapping[:params]), "elixIRC"}
+            #{"", Elixirc.Responses.response_modespec(mapping[:params]), "elixIRC"}
+            {nick, ["400 #{nick}!<user>@<hostname> :Unknown error for MODE"], ""}
         end
       "FAIL" -> 1 + []
       "PASS" -> 
