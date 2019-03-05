@@ -14,16 +14,17 @@ defmodule Elixirc.Commands do
     end
   end
 
-  def handle_nick(new_nick, old_nick, _hostname) do
+  def handle_nick(new_nick, old_nick, hostname) do
     Registry.lookup(Registry.Connections, new_nick)
     |> case do
-      [{_pid, nil}] -> {old_nick, Responses.response_nickclash(new_nick), "elixIRC"}
+      [{_pid, _pid2}] -> {old_nick, Responses.response_nickclash(new_nick), "elixIRC"}
       _ -> 
         Elixirc.Connections.change_nic({:via, Registry, {Registry.Connections, old_nick}}, new_nick)
         if (Elixirc.Connections.get({:via, Registry, {Registry.Connections, new_nick}}, :registered) == true) do
           {new_nick, ["NICK :#{new_nick}"], "#{old_nick}!<user>@<hostname>"}
         else
           Elixirc.Connections.put({:via, Registry, {Registry.Connections, new_nick}}, :registered, true)
+          Elixirc.Connections.put({:via, Registry, {Registry.Connections, new_nick}}, :host, hostname)
           {new_nick, Responses.response_registration(), "elixIRC"}
         end
     end
@@ -35,6 +36,7 @@ defmodule Elixirc.Commands do
     {:ok, _pid} = Elixirc.Connections.start_link([name: name])
     Elixirc.Connections.put(name, :user, "~"<>username)
     Elixirc.Connections.put(name, :realname, realname)
+    Elixirc.Connections.put(name, :nick, temp_nick)
     {temp_nick, [], "elixIRC"}
   end
 
@@ -44,6 +46,12 @@ defmodule Elixirc.Commands do
     Elixirc.Connections.put(name, :realname, realname)
     Elixirc.Connections.put(name, :registered, true)
     {nick, Responses.response_registration(), "elixIRC"}
+  end
+
+  def handle_join(nick, channelname) do
+    [{pid, _}] = Registry.lookup(Registry.Connections, nick)
+    Registry.register(Registry.Channels, channelname, pid)
+    {nick, [], "elixIRC"}
   end
 
   def handle_mode(nick, mode_item, modestring) do
@@ -75,7 +83,7 @@ defmodule Elixirc.Commands do
   defp generate_good_nick() do
     temp_nick = Elixirc.Randstring.randomizer(20, :downcase)
     case Registry.lookup(Registry.Connections, temp_nick) do
-      {:ok, _pid} -> generate_good_nick()
+      [{_pid, _pid2}] -> generate_good_nick()
       _ -> temp_nick
     end
   end

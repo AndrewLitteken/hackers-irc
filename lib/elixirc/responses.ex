@@ -65,4 +65,10 @@ defmodule Elixirc.Responses do
     end 
   end
 
+  def response_nosuchchannel(channel) do
+    [
+      "403 <nick> #{channel} :No such channel"
+    ]
+  end
+
 end

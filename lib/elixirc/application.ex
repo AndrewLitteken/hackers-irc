@@ -5,9 +5,10 @@ defmodule Elixirc.Application do
 		#List Children and Start them here
 		children = [
 			{Task.Supervisor, name: Elixirc.TaskSupervisor},
-			{DynamicSupervisor, name: Elixirc.ConnectionsSupervisor, strategy: :one_for_one},
-			{Elixirc.ChannelListener, name: :ChannelListener},
+			{DynamicSupervisor, name: Elixirc.ChannelsSupervisor, strategy: :one_for_one},
+			{Registry, keys: :unique, name: Registry.ChannelState},
 			{Registry, keys: :unique, name: Registry.Connections},
+			{Elixirc.ChannelListener, name: :ChannelListener},
 			{Registry, keys: :duplicate, listeners: [:ChannelListener], name: Registry.Channels},
 			Supervisor.child_spec({Task, fn -> Elixirc.run_server(6667) end}, restart: :permanent),
 		]

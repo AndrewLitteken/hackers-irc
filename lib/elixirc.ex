@@ -31,8 +31,9 @@ defmodule Elixirc do
         end
         Logger.info("Socket Closed")
         exit(:shutdown)
-      {:outging, data} ->
+      {:outgoing, data} ->
         :gen_tcp.send(socket, data)
+        nick
       {:error, error} ->
         if String.length(nick) != 0 do
           Elixirc.Connections.close({:via, Registry, {Registry.Connections, nick}})
@@ -45,7 +46,7 @@ defmodule Elixirc do
 
   defp process_message(data, nick, socket) do
     mapping = Elixirc.Task.MessageParser.call(data)
-    Logger.info(inspect(mapping))
+    Logger.info(mapping[:command])
     case mapping[:command] do
       "NICK" ->
         result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^[^ :,]+$"}]
@@ -55,7 +56,7 @@ defmodule Elixirc do
             hostname = List.to_string(resolve_hostname(socket))
             Commands.handle_nick(key, nick, hostname)
           {:error, _}  ->
-            {"", Elixirc.Responses.response_nickspec(mapping[:params]), "elixIRC"}
+            {nick, Elixirc.Responses.response_nickspec(mapping[:params]), "elixIRC"}
         end
       "USER" ->
          result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^[^ :,]+$"}, {:matches, "0"}, {:matches, "*"}, {:pattern, "^[^:,]+$"}]
@@ -64,14 +65,16 @@ defmodule Elixirc do
              [head|tail] = mapping[:params]
              Commands.handle_user(nick, head, List.last(tail))
            {:error, _} ->
-            {"", Elixirc.Responses.response_userspec(mapping[:params]), "elixIRC"}
+            {nick, Elixirc.Responses.response_userspec(mapping[:params]), "elixIRC"}
           end
       "JOIN" ->
-        result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^#[^:, ]{32}"}]
+        result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^#[^:, ]*"}]
         case result do
           {:ok, _} ->
             [head|_tail] = mapping[:params]
-            Commands.handle_join(nick, )
+            Commands.handle_join(nick, head)
+          {:error, _} ->
+            {nick, Elixirc.Responses.response_nosuchchannel(mapping[:params]), "elixIRC"}
         end
       "PING" -> {nick, Commands.pong(hd(mapping[:params])), "elixIRC"}
       "PONG" ->

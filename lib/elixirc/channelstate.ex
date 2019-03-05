@@ -1,8 +1,8 @@
 defmodule Elixirc.ChannelState do
-	use Agent, restart: :temporary
+	use Agent, restart: :permanent
 	require Logger
 
-	defstruct name: "", mode: MapSet.new([:secret, :noexternal]), topic: ""
+	defstruct name: "", modes: MapSet.new([:s, :n]), topic: "", owner: "", users: [], created: DateTime.utc_now()
 
 	@doc"""
 	Starts the Channel State Agent
@@ -23,6 +23,11 @@ defmodule Elixirc.ChannelState do
 	"""
 	def put(channel, key, value) do
 		Agent.update(channel, &Map.put(&1, key, value))
+	end
+
+	def adduser(channel, value) do
+		old_list = get(channel, :users)
+		Agent.update(channel, &Map.replace!(&1, :users, [value|old_list]))
 	end
 
 	def close(channel) do
