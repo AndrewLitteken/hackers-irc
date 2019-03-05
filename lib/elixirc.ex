@@ -31,8 +31,8 @@ defmodule Elixirc do
         end
         Logger.info("Socket Closed")
         exit(:shutdown)
-      {:outgoing, data} ->
-        :gen_tcp.send(socket, data)
+      {:outgoing, data, source} ->
+        write_message(data, socket, source)
         nick
       {:error, error} ->
         if String.length(nick) != 0 do
@@ -110,6 +110,10 @@ defmodule Elixirc do
         Logger.info("Falling back to ip address")
         Enum.join(Tuple.to_list(ip), ".")
     end
+  end
+
+  def write_message(data, socket, source) do
+    :gen_tcp.send(socket, ":"<>source<>" "<>data<>"\r\n")
   end
 
   def write_lines(lines, socket, {:via, Registry, {Registry.Connections, ""}} = _name, source) do
