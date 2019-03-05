@@ -83,7 +83,7 @@ defmodule Elixirc.Commands do
                     {nick, ["221 #{nick}!<user>@<hostname> +#{spec_modes}"], "elixIRC"}
                 end
             else
-              {nick, ["502 #{nick}!<user>@<hostname> :Cant change mode for other users"], "elixIRC"}
+              {nick, ["502 #{nick}!<user>@<hostname> :Can't change mode for other users"], "elixIRC"}
             end
           _ ->
             {nick, ["401 #{nick}!<user>@<hostname> :No such nick/channel"], "elixIRC"}

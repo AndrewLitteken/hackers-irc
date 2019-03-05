@@ -51,7 +51,7 @@ defmodule Elixirc.Responses do
   	]
   end
 
-  def response_userspec(params) do
+  def response_userspec(_params) do
     [
     ]
   end
