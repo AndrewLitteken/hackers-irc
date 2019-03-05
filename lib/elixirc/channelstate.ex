@@ -2,7 +2,7 @@ defmodule Elixirc.ChannelState do
 	use Agent, restart: :temporary
 	require Logger
 
-	defstruct name: "", mode: {}, topic: ""
+	defstruct name: "", mode: MapSet.new([:secret, :noexternal]), topic: ""
 
 	@doc"""
 	Starts the Channel State Agent
