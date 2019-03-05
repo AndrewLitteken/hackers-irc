@@ -12,7 +12,10 @@ defmodule Elixirc.ChannelListener do
 
 	def listen() do
 		receive do
-			cmd -> IO.puts(inspect cmd)
+			{:register, _registry, key, _pid, _value} when ->
+				:ok
+			{:unregister, _registry, key, _pid, _value} when [] = Registry.lookup(Elixirc.Channels, key) ->
+				:ok #delete channel
 		end
 		listen()
 	end
