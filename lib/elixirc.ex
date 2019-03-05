@@ -124,11 +124,11 @@ defmodule Elixirc do
     cond do
       source == "" ->
         lines
-        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) end)
+        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) |> String.replace("<user>", Elixirc.Connections.get(name, :user)) end)
         |> Enum.each(fn x -> :gen_tcp.send(socket, x<>"\r\n") end)
       true ->
         lines
-        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) end)
+        |> Enum.map(fn x -> String.replace(x, "<nick>", nick) |> String.replace("<hostname>", Elixirc.Connections.get(name, :host)) |> String.replace("<user>", Elixirc.Connections.get(name, :user)) end)
         |> Enum.each(fn x -> :gen_tcp.send(socket, ":"<>source<>" "<>x<>"\r\n") end)
     end
   end

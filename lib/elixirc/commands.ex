@@ -64,7 +64,7 @@ defmodule Elixirc.Commands do
               {:ok, nil} ->
                 {nick, ["MODE #{mode_item} #{modestring}"], "#{nick}!<user>@<hostname>"}
               {:return, spec_modes} ->
-                {nick, ["221 #{nick}!<user>@<hostname> #{mode_item} +#{spec_modes}"], "elixIRC"}
+                {nick, ["324 #{nick}!<user>@<hostname> #{mode_item} +#{spec_modes}"], "elixIRC"}
             end
           _ ->
             {nick, ["401 #{nick}!<user>@<hostname> :No such nick/channel"], "elixIRC"}
@@ -80,13 +80,13 @@ defmodule Elixirc.Commands do
                     {nick, ["MODE #{nick} #{modestring}"], "#{nick}!<user>@<hostname>"}
                   {:return, spec_modes} ->
                     Logger.info(spec_modes)
-                    {nick, ["221 #{nick}!<user>@<hostname> +#{spec_modes}"], "elixIRC"}
+                    {nick, ["221 #{nick} +#{spec_modes}"], "elixIRC"}
                 end
             else
-              {nick, ["502 #{nick}!<user>@<hostname> :Can't change mode for other users"], "elixIRC"}
+              {nick, ["502 #{nick} :Can't change mode for other users"], "elixIRC"}
             end
           _ ->
-            {nick, ["401 #{nick}!<user>@<hostname> :No such nick/channel"], "elixIRC"}
+            {nick, ["401 #{nick} :No such nick/channel"], "elixIRC"}
         end
     end
   end
