@@ -88,7 +88,7 @@ defmodule Elixirc do
             Commands.handle_mode(nick, head, List.first(tail))
           {:error, _} ->
             #{"", Elixirc.Responses.response_modespec(mapping[:params]), "elixIRC"}
-            {nick, ["400 #{nick}!<user>@<hostname> :Unknown error for MODE"], ""}
+            {nick, ["400 #{nick}!<user>@<hostname> :Unknown error for MODE"], "elixIRC"}
         end
       "FAIL" -> 1 + []
       "PASS" ->

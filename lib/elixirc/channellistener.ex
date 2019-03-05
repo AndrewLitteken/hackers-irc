@@ -31,7 +31,7 @@ defmodule Elixirc.ChannelListener do
 						user = Elixirc.Connections.get(value, :user)
 						host = Elixirc.Connections.get(value, :host)
 						Elixirc.ChannelState.adduser(name, nick)
-						Enum.each(Registry.lookup(Registry.Channels, key), fn {pid, _value} -> send pid, {:outgoing, "#{nick}!#{user}@#{host} JOIN #{key}\r\n"} end)
+						Enum.each(Registry.lookup(Registry.Channels, key), fn {pid, _value} -> send pid, {:outgoing, ":#{nick}!#{user}@#{host} JOIN #{key}\r\n"} end)
 						send pid, {:outgoing, rpl_namereply(name, nick, key)}
 						send pid, {:outgoing, ":elixIRC 366 #{nick} #{key} :End of /NAMES list.\r\n"}
 				end

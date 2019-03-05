@@ -2,7 +2,7 @@ defmodule Elixirc.Connections do
 	use Agent, restart: :temporary
 	require Logger
 
-	defstruct registered: false, user: "", host: "", nick: "", realname: "", channels: {}, modes: {}
+	defstruct registered: false, user: "", host: "", nick: "", realname: "", channels: {}, modes: MapSet.new()
 
 	@doc"""
   	Starts the Connections Agent
@@ -46,30 +46,22 @@ defmodule Elixirc.Connections do
 			"-"<>rest ->
 				change_user_mode(connection, rest, "sub")
 			nil ->
-				tuple = Agent.get(connection, &Map.get(&1, :modes))
-				{:return, List.to_string(Tuple.to_list(tuple))}
+				modes = Agent.get(connection, &Map.get(&1, :modes))
+				{:return, List.to_string(Enum.map(MapSet.to_list(modes), fn n -> to_string(n) end))}
 			_ ->
 				case op do
 					"add" ->
-						tuple = Agent.get(connection, &Map.get(&1, :modes))
-						tuple_string = List.to_string(Tuple.to_list(tuple))
-						Logger.info(inspect(tuple))
-						tuple = if not String.contains?(tuple_string, String.at(modestring, 0)) do
-							Tuple.append(tuple, String.at(modestring, 0))
-						else
-							tuple
+						modes = Agent.get(connection, &Map.get(&1, :modes))
+						modes = if not MapSet.member?(modes, String.to_atom(String.at(modestring, 0))) do
+							MapSet.put(modes, String.to_atom(String.at(modestring, 0)))
 						end
-						Logger.info(inspect(tuple))
-						Agent.update(connection, &Map.put(&1, :modes, tuple))
+						Agent.update(connection, &Map.put(&1, :modes, modes))
 					"sub" ->
-						tuple = Agent.get(connection, &Map.get(&1, :modes))
-						tuple_string = List.to_string(Tuple.to_list(tuple))
-						char = String.at(modestring, 0)
-						i = if String.contains?(tuple_string, char) do
-							Enum.find_index(Tuple.to_list(tuple), fn x -> x == char end)
+						modes = Agent.get(connection, &Map.get(&1, :modes))
+						modes = if MapSet.member?(modes, String.to_atom(String.at(modestring, 0))) do
+							MapSet.delete(modes, String.to_atom(String.at(modestring, 0)))
 						end
-						tuple = Tuple.delete_at(tuple, i)
-						Agent.update(connection, &Map.put(&1, :modes, tuple))
+						Agent.update(connection, &Map.put(&1, :modes, modes))
 				end
 				change_user_mode(connection, String.slice(modestring, 1, String.length(modestring)))
 		end
