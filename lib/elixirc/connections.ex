@@ -2,7 +2,7 @@ defmodule Elixirc.Connections do
 	use Agent, restart: :temporary
 	require Logger
 
-	defstruct registered: false, user: "", host: "", nick: "", realname: "", channels: {}
+	defstruct registered: false, user: "", host: "", nick: "", realname: "", channels: {}, modes: {}
 
 	@doc"""
   	Starts the Connections Agent
@@ -36,6 +36,46 @@ defmodule Elixirc.Connections do
 					x
 			end
 		end)
+	end
+
+	def change_user_mode(connection, modestring, op \\ "add") when modestring != "" do
+		case modestring do
+			"+"<>rest ->
+				change_user_mode(connection, rest, "add")
+			"-"<>rest ->
+				change_user_mode(connection, rest, "sub")
+			nil ->
+				tuple = Agent.get(connection, &Map.get(&1, :modes))
+				Logger.info(inspect(tuple))
+				{:return, List.to_string(Tuple.to_list(tuple))}
+			_ ->
+				case op do
+					"add" ->
+						tuple = Agent.get(connection, &Map.get(&1, :modes))
+						tuple_string = List.to_string(Tuple.to_list(tuple))
+						Logger.info(inspect(tuple))
+						tuple = if not String.contains?(tuple_string, String.at(modestring, 0)) do
+							Tuple.append(tuple, String.at(modestring, 0))
+						else
+							tuple
+						end
+						Logger.info(inspect(tuple))
+						Agent.update(connection, &Map.put(&1, :modes, tuple))
+					"sub" ->
+						tuple = Agent.get(connection, &Map.get(&1, :modes))
+						tuple_string = List.to_string(Tuple.to_list(tuple))
+						char = String.at(modestring, 0)
+						if String.contains?(tuple_string, char) do
+							for i <- tuple_size(tuple)-1..0, elem(tuple, i) == char, do: Tuple.delete_at(tuple, i)
+						end
+						Agent.update(connection, &Map.put(&1, :modes, tuple))
+				end
+				change_user_mode(connection, String.slice(modestring, 1, String.length(modestring)))
+		end
+	end
+
+	def change_user_mode(_, modestring, _) when modestring == "" do
+		{:ok, nil}
 	end
 
 	def close(connection) do

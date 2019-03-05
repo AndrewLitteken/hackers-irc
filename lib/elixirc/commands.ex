@@ -1,6 +1,7 @@
 defmodule Elixirc.Commands do
 	alias Elixirc.Responses, as: Responses
-	
+	require Logger
+
 	def handle_nick(new_nick, "" = _old_nick, hostname) do
     name = {:via, Registry, {Registry.Connections, new_nick}}
     Elixirc.Connections.start_link([name: name])
@@ -43,6 +44,27 @@ defmodule Elixirc.Commands do
     Elixirc.Connections.put(name, :realname, realname)
     Elixirc.Connections.put(name, :registered, true)
     {nick, Responses.response_registration(), "elixIRC"}
+  end
+
+  def handle_mode(nick, mode_item, modestring) do
+    case mode_item do
+      "#" <> channel ->
+        name = {:via, Registry, {Registry.Connections, channel}}
+      mode_nick ->
+        Logger.info(mode_nick)
+        if mode_nick == nick do
+            result = Elixirc.Connections.change_user_mode({:via, Registry, {Registry.Connections, mode_nick}}, modestring)
+            case result do
+              {:ok, nil} -> 
+                {nick, ["MODE #{nick} #{modestring}"], "#{nick}!<user>@<hostname>"}
+              {:return, spec_modes} ->
+                Logger.info(spec_modes)
+                {nick, ["221 #{nick}!<user>@<hostname> +#{spec_modes}"], ""}
+            end
+        else
+          {nick, ["502 #{nick}!<user>@<hostname> :Cant change mode for other users"], ""}
+        end
+    end
   end
 
   defp generate_good_nick() do

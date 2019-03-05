@@ -51,6 +51,11 @@ defmodule Elixirc.Responses do
   	]
   end
 
+  def response_userspec(params) do
+    [
+    ]
+  end
+
   def response_nickspec(params) do
     case params do
       ["" | _ ] -> 

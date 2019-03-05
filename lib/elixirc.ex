@@ -54,12 +54,27 @@ defmodule Elixirc do
             {"", Elixirc.Responses.response_nickspec(mapping[:params]), "elixIRC"}
         end
       "USER" ->
-        [head|tail] = mapping[:params]
-        Commands.handle_user(nick, head, List.last(tail))
+         result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^[^ :,]+$"}, {:matches, "0"}, {:matches, "*"}, {:pattern, "^[^:,]+$"}]
+         case result do
+           {:ok, _} ->
+             [head|tail] = mapping[:params]
+             Commands.handle_user(nick, head, List.last(tail))
+           {:error, _} ->
+            {"", Elixirc.Responses.response_userspec(mapping[:params]), "elixIRC"}
+          end
       "PING" -> {nick, Commands.pong(hd(mapping[:params])), "elixIRC"}
       "PONG" ->
         Logger.info("Received PONG from Client - Doing nothing about this at the moment")
         {nick, [], "elixIRC"}
+      "MODE" ->
+        result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^[^ :,]+$"}, {:option, {:pattern, "(\+|\-)[a-zA-z]+"}}]
+        case result do
+          {:ok, _} ->
+            [head|tail] = mapping[:params]
+            Commands.handle_mode(nick, head, List.first(tail))
+          {:error, _} ->
+            {"", Elixirc.Responses.response_modespec(mapping[:params]), "elixIRC"}
+        end
       "FAIL" -> 1 + []
       "PASS" -> 
         Logger.info("Received PASS from Client - Ignoring for now")
