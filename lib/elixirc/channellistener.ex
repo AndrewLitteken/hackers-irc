@@ -22,18 +22,18 @@ defmodule Elixirc.ChannelListener do
 						host = Elixirc.Connections.get(value, :host)
 						Elixirc.ChannelState.put(name, :owner, nick)
 						Elixirc.ChannelState.adduser(name, nick)
-						send pid, {:outgoing, ":#{nick}!#{user}@#{host} JOIN #{key}\r\n"}
-						send pid, {:outgoing, ":elixIRC MODE #{key} +ns\r\n"}
+						send pid, {:outgoing, message_join(key), "#{nick}!#{user}@#{host}"}
+						send pid, {:outgoing, "MODE #{key} +ns", "elixIRC"}
 						send pid, {:outgoing, rpl_namereply(name, nick, key)}
-						send pid, {:outgoing, ":elixIRC 366 #{nick} #{key} :End of /NAMES list.\r\n"}
+						send pid, {:outgoing, message_endnames(nick, key), "elixIRC"}
 					_ ->
 						nick = Elixirc.Connections.get(value, :nick)
 						user = Elixirc.Connections.get(value, :user)
 						host = Elixirc.Connections.get(value, :host)
 						Elixirc.ChannelState.adduser(name, nick)
-						Enum.each(Registry.lookup(Registry.Channels, key), fn {pid, _value} -> send pid, {:outgoing, ":#{nick}!#{user}@#{host} JOIN #{key}\r\n"} end)
-						send pid, {:outgoing, rpl_namereply(name, nick, key)}
-						send pid, {:outgoing, ":elixIRC 366 #{nick} #{key} :End of /NAMES list.\r\n"}
+						Enum.each(Registry.lookup(Registry.Channels, key), fn {pid, _value} -> send pid, {:outgoing, message_join(key), "#{nick}!#{user}@#{host}"} end)
+						send pid, {:outgoing, rpl_namereply(name, nick, key), "elixIRC"}
+						send pid, {:outgoing, message_endnames(nick, key), "elixIRC"}
 				end
 			{:unregister, _registry, key, pid, value} ->
 				name = {:via, Registry, {Registry.ChannelState, key}}
@@ -43,12 +43,12 @@ defmodule Elixirc.ChannelListener do
 						nick = Elixirc.Connections.get(value, :nick)
 						user = Elixirc.Connections.get(value, :user)
 						host = Elixirc.Connections.get(value, :host)
-						send pid, {:outgoing, ":#{nick}!#{user}@#{host} PART #{key}\r\n"}
+						send pid, {:outgoing, message_part(key), "#{nick}!#{user}@#{host}"}
 					_ ->
 						nick = Elixirc.Connections.get(value, :nick)
 						user = Elixirc.Connections.get(value, :user)
 						host = Elixirc.Connections.get(value, :host)
-						send pid, {:outgoing, ":#{nick}!#{user}@#{host} PART #{key}\r\n"}
+						send pid, {:outgoing, message_part(key), "#{nick}!#{user}@#{host}"}
 
 				end
 				:ok #delete channel
@@ -63,9 +63,23 @@ defmodule Elixirc.ChannelListener do
 		users = Enum.join(Elixirc.ChannelState.get(channelstate, :users), " ") |> String.replace(owner, "@"<>owner)
 		cond do
 			MapSet.member?(Elixirc.ChannelState.get(channelstate,:modes), :s) ->
-				":elixIRC 353 #{nick} @ #{channelname} :#{users}\r\n"
+				 "353 #{nick} @ #{channelname} :#{users}"
 			true ->
-				":elixIRC 353 #{nick} = #{channelname} :#{users}\r\n"
+				"353 #{nick} = #{channelname} :#{users}"
 		end
 	end
+
+	defp message_join(channelname) do
+		"JOIN #{channelname}"
+	end
+
+	defp message_endnames(nick, channelname) do
+		"366 #{nick} #{channelname} :End of /NAMES list."
+	end
+
+	defp message_part(channelname) do
+		"PART #{channelname}"
+	end
+
+
 end
