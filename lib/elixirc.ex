@@ -76,6 +76,15 @@ defmodule Elixirc do
           {:error, _} ->
             {nick, Elixirc.Responses.response_nosuchchannel(mapping[:params]), "elixIRC"}
         end
+      "PRIVMESSAGE" ->
+        [target | data] = mapping[:params]
+        {sourceuser, _} = Registry.lookup(Registry.Connections, nick)
+        {_, targetconnection} = Registry.lookup(Registry.Connections, target)
+        user = Elixirc.Connections.get(sourceuser, :user)
+        host = Elixirc.Connections.get(sourceuser, :host)
+        message = "#{nick}!#{user}@#{host} PRIVMESSAGE #{target} :#{data}"
+        send targetconnection, message
+
       "PING" -> {nick, Commands.pong(hd(mapping[:params])), "elixIRC"}
       "PONG" ->
         Logger.info("Received PONG from Client - Doing nothing about this at the moment")
