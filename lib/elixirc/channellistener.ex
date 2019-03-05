@@ -35,7 +35,22 @@ defmodule Elixirc.ChannelListener do
 						send pid, {:outgoing, rpl_namereply(name, nick, key)}
 						send pid, {:outgoing, ":elixIRC 366 #{nick} #{key} :End of /NAMES list.\r\n"}
 				end
-			{:unregister, _registry, key, _pid, _value} ->
+			{:unregister, _registry, key, pid, value} ->
+				name = {:via, Registry, {Registry.ChannelState, key}}
+				case Registry.lookup(Registry.Channels, key) do
+					[] ->
+						Process.exit(name, :shutdown)
+						nick = Elixirc.Connections.get(value, :nick)
+						user = Elixirc.Connections.get(value, :user)
+						host = Elixirc.Connections.get(value, :host)
+						send pid, {:outgoing, ":#{nick}!#{user}@#{host} PART #{key}\r\n"}
+					_ ->
+						nick = Elixirc.Connections.get(value, :nick)
+						user = Elixirc.Connections.get(value, :user)
+						host = Elixirc.Connections.get(value, :host)
+						send pid, {:outgoing, ":#{nick}!#{user}@#{host} PART #{key}\r\n"}
+
+				end
 				:ok #delete channel
 		end
 		listen()
@@ -47,7 +62,7 @@ defmodule Elixirc.ChannelListener do
 		#TODO Break this up as this will be too much for one command at some point
 		users = Enum.join(Elixirc.ChannelState.get(channelstate, :users), " ") |> String.replace(owner, "@"<>owner)
 		cond do
-			MapSet.member?(Elixirc.ChannelState.get(channelstate,:modes), :s) -> 
+			MapSet.member?(Elixirc.ChannelState.get(channelstate,:modes), :s) ->
 				":elixIRC 353 #{nick} @ #{channelname} :#{users}\r\n"
 			true ->
 				":elixIRC 353 #{nick} = #{channelname} :#{users}\r\n"
