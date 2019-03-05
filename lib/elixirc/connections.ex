@@ -27,7 +27,8 @@ defmodule Elixirc.Connections do
 
 	def change_nic(connection, nick) do
 		Agent.update(connection, fn x -> 
-			Registry.register(Registry.Connections, nick, nil)
+			{_, pid} = Registry.lookup(Registry.Connections, Map.get(x, :nick))
+			Registry.register(Registry.Connections, nick, pid)
 			|> case do
 				{:ok, _} -> 
 					Registry.unregister(Registry.Connections, Map.get(x, :nick))

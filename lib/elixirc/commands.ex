@@ -3,7 +3,7 @@ defmodule Elixirc.Commands do
 	require Logger
 
 	def handle_nick(new_nick, "" = _old_nick, hostname) do
-    name = {:via, Registry, {Registry.Connections, new_nick}}
+    name = {:via, Registry, {Registry.Connections, new_nick, self()}}
     Elixirc.Connections.start_link([name: name])
     |> case do
       {:ok, _pid} -> 
@@ -31,7 +31,7 @@ defmodule Elixirc.Commands do
 
   def handle_user("" = _nick, username, realname) do
     temp_nick = generate_good_nick()
-    name = {:via, Registry, {Registry.Connections, temp_nick}}
+    name = {:via, Registry, {Registry.Connections, temp_nick, self()}}
     {:ok, _pid} = Elixirc.Connections.start_link([name: name])
     Elixirc.Connections.put(name, :user, "~"<>username)
     Elixirc.Connections.put(name, :realname, realname)

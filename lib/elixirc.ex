@@ -3,7 +3,7 @@ defmodule Elixirc do
   alias Elixirc.Commands, as: Commands
 
   def run_server(port) do
-    opts = [:binary, packet: :line, active: false, reuseaddr: true]
+    opts = [:binary, packet: :line, active: true, reuseaddr: true]
     {:ok, socket} = :gen_tcp.listen(6667, opts)
     Logger.info("Server Started on Port: #{port}")
     loopaccecpt(socket)
@@ -17,18 +17,21 @@ defmodule Elixirc do
   end
 
   def serve(socket, nick \\ "") do
-    nick = case :gen_tcp.recv(socket, 0) do
-      {:ok, data} ->
+    
+    nick = receive do
+      {:tcp, _port, data} ->
         {nick, lines, source} = process_message(data, nick, socket)
         name = {:via, Registry, {Registry.Connections, nick}}
         write_lines(lines, socket, name, source)
         nick
-      {:error, :closed} ->
+      {:tcp_close, _port} ->
         if String.length(nick) != 0 do
           Elixirc.Connections.close({:via, Registry, {Registry.Connections, nick}})
         end
         Logger.info("Socket Closed")
         exit(:shutdown)
+      {:outging, data} -> 
+        :gen_tcp.send(socket, data)
       {:error, error} ->
         if String.length(nick) != 0 do
           Elixirc.Connections.close({:via, Registry, {Registry.Connections, nick}})
@@ -62,6 +65,13 @@ defmodule Elixirc do
            {:error, _} ->
             {"", Elixirc.Responses.response_userspec(mapping[:params]), "elixIRC"}
           end
+      "JOIN" ->
+        result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^#[^:, ]{32}"}]
+        case result do
+          {:ok, _} ->
+            [head|_tail] = mapping[:params]
+            Commands.handle_join(nick, )
+        end
       "PING" -> {nick, Commands.pong(hd(mapping[:params])), "elixIRC"}
       "PONG" ->
         Logger.info("Received PONG from Client - Doing nothing about this at the moment")
