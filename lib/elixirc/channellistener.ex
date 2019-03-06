@@ -36,7 +36,7 @@ defmodule Elixirc.ChannelListener do
 						send pid, {:outgoing, rpl_namereply(name, nick, key), "elixIRC"}
 						send pid, {:outgoing, message_endnames(nick, key), "elixIRC"}
 				end
-			{:unregister, _registry, key, _pid, value} ->
+			{:unregister, _registry, key, _pid} ->
 				name = {:via, Registry, {Registry.ChannelState, key}}
 				case Registry.lookup(Registry.Channels, key) do
 					[] ->
@@ -45,6 +45,8 @@ defmodule Elixirc.ChannelListener do
 						nick = Elixirc.Connections.get(value, :nick)
 						Elixirc.ChannelState.removeuser(name, nick)
 				end
+			anything_else ->
+				Logger.info(inspect(anything_else))
 		end
 		listen()
 	end
