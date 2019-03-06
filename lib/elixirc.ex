@@ -25,7 +25,7 @@ defmodule Elixirc do
         name = {:via, Registry, {Registry.Connections, nick}}
         write_lines(lines, socket, name, source)
         nick
-      {:tcp_close, _port} ->
+      {:tcp_closed, _port} ->
         if String.length(nick) != 0 do
           user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
           hostname = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
@@ -59,6 +59,8 @@ defmodule Elixirc do
         end
         Logger.info(["Socket Crashed with exit code ", inspect(error)])
         exit(:shutdown)
+      cmd -> 
+        Logger.info(inspect(cmd))
     end
     serve(socket, nick)
   end
