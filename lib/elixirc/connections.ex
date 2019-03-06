@@ -2,7 +2,7 @@ defmodule Elixirc.Connections do
 	use Agent, restart: :temporary
 	require Logger
 
-	defstruct registered: false, user: "", host: "", nick: "", realname: "", channels: {}, modes: MapSet.new()
+	defstruct registered: false, user: "", host: "", nick: "", realname: "", modes: MapSet.new()
 
 	@doc"""
   	Starts the Connections Agent

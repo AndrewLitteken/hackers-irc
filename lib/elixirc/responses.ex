@@ -71,4 +71,10 @@ defmodule Elixirc.Responses do
     ]
   end
 
+  def response_noreregister() do
+    [
+      "462 <nick> :You may not reregister"
+    ]
+  end
+
 end

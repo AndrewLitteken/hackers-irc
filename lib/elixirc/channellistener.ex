@@ -39,7 +39,7 @@ defmodule Elixirc.ChannelListener do
 				name = {:via, Registry, {Registry.ChannelState, key}}
 				case Registry.lookup(Registry.Channels, key) do
 					[] ->
-						Process.exit(name, :shutdown)
+						Elixirc.ChannelState.close(name)
 						nick = Elixirc.Connections.get(value, :nick)
 						user = Elixirc.Connections.get(value, :user)
 						host = Elixirc.Connections.get(value, :host)
@@ -48,10 +48,9 @@ defmodule Elixirc.ChannelListener do
 						nick = Elixirc.Connections.get(value, :nick)
 						user = Elixirc.Connections.get(value, :user)
 						host = Elixirc.Connections.get(value, :host)
+						Elixirc.ChannelState.removeuser(name, nick)
 						send pid, {:outgoing, message_part(key), "#{nick}!#{user}@#{host}"}
-
 				end
-				:ok #delete channel
 		end
 		listen()
 	end

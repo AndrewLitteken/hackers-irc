@@ -21,7 +21,26 @@ defmodule Elixirc.Commands do
       _ -> 
         Elixirc.Connections.change_nic({:via, Registry, {Registry.Connections, old_nick}}, new_nick)
         if (Elixirc.Connections.get({:via, Registry, {Registry.Connections, new_nick}}, :registered) == true) do
-          {new_nick, ["NICK :#{new_nick}"], "#{old_nick}!<user>@<hostname>"}
+          name = {:via, Registry, {Registry.Connections, new_nick}}
+          channels = Registry.keys(Registry.Channels, self())
+          user = Elixirc.Connections.get(name, :user)
+          hostname = Elixirc.Connections.get(name, :host)
+          broadcastlist = MapSet.new(List.flatten(Enum.map(channels, fn name -> Registry.lookup(Registry.Channels, name) end)), fn x -> 
+            {pid, _} = x 
+            pid 
+          end)
+          Enum.each(broadcastlist, fn pid -> send pid, {:outgoing, "NICK :#{new_nick}", "#{old_nick}!#{user}@#{hostname}"} end)
+          Enum.each(channels, fn chan -> 
+            Elixirc.ChannelState.removeuser({:via, Registry, {Registry.ChannelState, chan}}, old_nick)
+            Elixirc.ChannelState.adduser({:via, Registry, {Registry.ChannelState, chan}}, new_nick)
+            if Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, chan}}, :owner) == old_nick do
+              Elixirc.ChannelState.put({:via, Registry, {Registry.ChannelState, chan}}, :owner, new_nick)
+            end
+          end)
+          case channels do 
+            [] -> {new_nick, ["NICK :#{new_nick}"], "#{old_nick}!<user>@<hostname>"}
+            _ -> {new_nick, [], "#{old_nick}!<user>@<hostname>"}
+          end
         else
           Elixirc.Connections.put({:via, Registry, {Registry.Connections, new_nick}}, :registered, true)
           Elixirc.Connections.put({:via, Registry, {Registry.Connections, new_nick}}, :host, hostname)
@@ -42,15 +61,22 @@ defmodule Elixirc.Commands do
 
   def handle_user(nick, username, realname) do
     name = {:via, Registry, {Registry.Connections, nick}}
-    Elixirc.Connections.put(name, :user, "~"<>username)
-    Elixirc.Connections.put(name, :realname, realname)
-    Elixirc.Connections.put(name, :registered, true)
-    {nick, Responses.response_registration(), "elixIRC"}
+    if Elixirc.Connections.get(name, :registered) == true do
+      {nick, Responses.response_noreregister(), "elixIRC"}
+    else
+      Elixirc.Connections.put(name, :user, "~"<>username)
+      Elixirc.Connections.put(name, :realname, realname)
+      Elixirc.Connections.put(name, :registered, true)
+      {nick, Responses.response_registration(), "elixIRC"}
+    end
   end
 
   def handle_join(nick, channelname) do
     [{pid, _}] = Registry.lookup(Registry.Connections, nick)
-    Registry.register(Registry.Channels, channelname, pid)
+    channels = Registry.keys(Registry.Channels, self())
+    if Enum.member?(channels, channelname) == false do 
+      Registry.register(Registry.Channels, channelname, pid)
+    end
     {nick, [], "elixIRC"}
   end
 
