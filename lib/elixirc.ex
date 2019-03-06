@@ -76,6 +76,18 @@ defmodule Elixirc do
           {:error, _} ->
             {nick, Elixirc.Responses.response_nosuchchannel(mapping[:params]), "elixIRC"}
         end
+      "PART" ->
+        result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^#[^: ]+(,#[^: ]+)*$"}, {:option, {:pattern, ".*"}}]
+        case result do
+          {:ok, _} ->
+            [head|_tail] = mapping[:params]
+            case Commands.handle_part(nick, String.split(head, ",")) do
+              {:ok, _} -> {nick, ["PART #{head}"], "#{nick}!<user>@<hostname>"}
+              {:error, msg} -> {nick, [msg], "elixIRC"}
+            end
+          {:error, msg} ->
+            {nick, [msg], "elixIRC"}
+        end
       "PRIVMESSAGE" ->
         [target | data] = mapping[:params]
         {sourceuser, _} = Registry.lookup(Registry.Connections, nick)

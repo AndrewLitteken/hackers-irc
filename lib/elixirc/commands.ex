@@ -117,6 +117,29 @@ defmodule Elixirc.Commands do
   	exit(:shutdown)
   end
 
+  def handle_part(nick, [channelname | tail] = _channels) do
+    [{pid, _}] = Registry.lookup(Registry.Connections, nick)
+    case Registry.lookup(Registry.Channels, channelname) do
+      [{_,_}] ->
+        users = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channelname}}, :users)
+        if Enum.find(users, fn x -> x == nick end) != nil do
+          Registry.unregister_match(Registry.Channels, channelname, pid)
+          case handle_part(nick, tail) do
+            {:ok, "no channels"} -> {:ok, "good"}
+            {:error, msg} -> {:error, msg}
+          end
+        else
+          {:error, "442 #{nick} #{channelname} :You're not on that channel"}
+        end
+      _ ->
+        {:error, "403 #{nick} #{channelname} :No such channel"}
+    end
+  end
+
+  def handle_part(_nick, [] = _channels) do
+    {:ok, "no channels"}
+  end
+
   def handle_unknown(nick, cmd) do
   	{nick, Responses.response_unknown(cmd), "elixIRC"}
   end
