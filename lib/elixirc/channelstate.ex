@@ -2,7 +2,7 @@ defmodule Elixirc.ChannelState do
 	use Agent, restart: :permanent
 	require Logger
 
-	defstruct name: "", modes: MapSet.new([:s, :n]), topic: "", owner: "", users: MapSet.new(), created: DateTime.utc_now()
+	defstruct name: "", modes: MapSet.new(["s", "n"]), topic: "", owner: "", users: MapSet.new(), created: DateTime.utc_now()
 
 	@doc"""
 	Starts the Channel State Agent
@@ -57,7 +57,10 @@ defmodule Elixirc.ChannelState do
 		Agent.stop(channel)
 	end
 
-	def change_channel_mode(channel, modestring, op \\ "add") when modestring != "" do
+	def change_channel_mode(channel, modestring, op \\ "add")
+
+	def change_channel_mode(channel, modestring, op) when modestring != "" do
+		Logger.info(modestring)
 		case modestring do
 			"+"<>rest ->
 				change_channel_mode(channel, rest, "add")
@@ -69,21 +72,15 @@ defmodule Elixirc.ChannelState do
 			_ ->
 				case op do
 					"add" ->
-						modes = Agent.get(channel, &Map.get(&1, :modes))
-						modes = MapSet.put(modes, String.at(modestring, 0))
-						Agent.update(channel, &Map.put(&1, :modes, modes))
+						addmode(channel, String.at(modestring, 0))
 					"sub" ->
-						modes = Agent.get(channel, &Map.get(&1, :modes))
-						modes = if MapSet.member?(modes, String.to_atom(String.at(modestring, 0))) do
-							MapSet.delete(modes, String.to_atom(String.at(modestring, 0)))
-						end
-						Agent.update(channel, &Map.put(&1, :modes, modes))
+						removemode(channel, String.at(modestring, 0))
 				end
 				change_channel_mode(channel, String.slice(modestring, 1, String.length(modestring)), op)
 		end
 	end
 
-	def change_user_mode(_, modestring, _) when modestring == "" do
+	def change_channel_mode(_, modestring, _) when modestring == "" do
 		{:ok, nil}
 	end
 

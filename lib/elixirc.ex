@@ -20,22 +20,41 @@ defmodule Elixirc do
 
     nick = receive do
       {:tcp, _port, data} ->
+        Logger.info(data)
         {nick, lines, source} = process_message(data, nick, socket)
         name = {:via, Registry, {Registry.Connections, nick}}
         write_lines(lines, socket, name, source)
         nick
       {:tcp_close, _port} ->
         if String.length(nick) != 0 do
-          Enum.each(Registry.keys(Registry.Channels, self()), fn x -> Registry.unregister(Elixirc.Channels, x) end)
+          user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
+          hostname = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
+          channels = Registry.keys(Registry.Channels, self())
+          broadcastlist = MapSet.new(List.flatten(Enum.map(channels, fn name -> Registry.lookup(Registry.Channels, name) end)), fn x -> 
+            {pid, _} = x 
+            pid 
+          end)
+          Enum.each(broadcastlist, fn pid -> send pid, {:outgoing, "QUIT :Remote host closed the connection", "#{nick}!#{user}@#{hostname}"} end)
+          Enum.each(channels, fn x -> Registry.unregister(Registry.Channels, x) end)
           Elixirc.Connections.close({:via, Registry, {Registry.Connections, nick}})
         end
         Logger.info("Socket Closed")
         exit(:shutdown)
       {:outgoing, data, source} ->
-        write_message(data, socket, source)
+        write_message(socket, data, source)
         nick
       {:error, error} ->
         if String.length(nick) != 0 do
+          user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
+          hostname = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
+          channels = Registry.keys(Registry.Channels, self())
+          broadcastlist = MapSet.new(List.flatten(Enum.map(channels, fn name -> Registry.lookup(Registry.Channels, name) end)), fn x -> 
+            {pid, _} = x 
+            pid 
+          end)
+          reason = Atom.to_string(error)
+          Enum.each(broadcastlist, fn pid -> send pid, {:outgoing, "QUIT :#{reason}", "#{nick}!#{user}@#{hostname}"} end)
+          Enum.each(channels, fn x -> Registry.unregister(Registry.Channels, x) end)
           Elixirc.Connections.close({:via, Registry, {Registry.Connections, nick}})
         end
         Logger.info(["Socket Crashed with exit code ", inspect(error)])
@@ -88,14 +107,17 @@ defmodule Elixirc do
           {:error, msg} ->
             {nick, [msg], "elixIRC"}
         end
-      "PRIVMESSAGE" ->
-        [target | data] = mapping[:params]
-        {sourceuser, _} = Registry.lookup(Registry.Connections, nick)
-        {_, targetconnection} = Registry.lookup(Registry.Connections, target)
-        user = Elixirc.Connections.get(sourceuser, :user)
-        host = Elixirc.Connections.get(sourceuser, :host)
-        message = "#{nick}!#{user}@#{host} PRIVMESSAGE #{target} :#{data}"
-        send targetconnection, message
+      "PRIVMSG" ->
+        result = Elixirc.Validate.validate mapping[:params], [{:pattern, ".*"}, {:pattern, ".*"}]
+        case result do
+          {:ok, _} ->
+            [target|data] = mapping[:params]
+            user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
+            host = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
+            Commands.handle_privmsg(nick, target, {:outgoing, "PRIVMSG #{target} :"<>hd(data), "#{nick}!#{user}@#{host}"})
+          {:error, msg} ->
+            {nick, [msg], "elixIRC"}
+        end
 
       "PING" -> {nick, Commands.pong(hd(mapping[:params])), "elixIRC"}
       "PONG" ->
@@ -106,6 +128,7 @@ defmodule Elixirc do
         case result do
           {:ok, _} ->
             [head|tail] = mapping[:params]
+            Logger.info(inspect(tail))
             Commands.handle_mode(nick, head, List.first(tail))
           {:error, _} ->
             #{"", Elixirc.Responses.response_modespec(mapping[:params]), "elixIRC"}
@@ -133,7 +156,7 @@ defmodule Elixirc do
     end
   end
 
-  def write_message(data, socket, source) do
+  def write_message(socket, data, source) do
     :gen_tcp.send(socket, ":"<>source<>" "<>data<>"\r\n")
   end
 

@@ -25,7 +25,6 @@ defmodule Elixirc.Validate do
   end
   
     defp check_param([param_head | param_tail] = param, [spec_head | spec_tail] = _spec) do
-      Logger.info(inspect(spec_head))
       result = case spec_head do
         {:matches, string} ->
           if string == param_head do

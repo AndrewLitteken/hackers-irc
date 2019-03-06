@@ -84,16 +84,32 @@ defmodule Elixirc.Commands do
     case mode_item do
       "#" <> _channel ->
         case Registry.lookup(Registry.Channels, mode_item) do
-          [{_,_}] ->
+          [] ->
+            {nick, ["403 #{nick} #{mode_item} :No such channel"], "elixIRC"}
+          _ ->
+            oldmodes = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, mode_item}}, :modes)
             result = Elixirc.ChannelState.change_channel_mode({:via, Registry, {Registry.ChannelState, mode_item}}, modestring)
             case result do
               {:ok, nil} ->
-                {nick, ["MODE #{mode_item} #{modestring}"], "#{nick}!<user>@<hostname>"}
+                newmodes = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, mode_item}}, :modes)
+                added = MapSet.difference(newmodes, oldmodes)
+                subtracted = MapSet.difference(oldmodes, newmodes)
+                resultstring = cond do
+                   MapSet.size(added) > 0 and MapSet.size(subtracted) > 0 -> "+"<>Enum.join(MapSet.to_list(added), "")<>"-"<>Enum.join(MapSet.to_list(subtracted), "")
+                   MapSet.size(added) > 0 -> "+"<>Enum.join(MapSet.to_list(added), "")
+                   MapSet.size(subtracted) > 0 -> "-"<>Enum.join(MapSet.to_list(subtracted), "")
+                   true -> ""
+                end
+                user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
+                hostname = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
+                if !MapSet.equal?(oldmodes, newmodes) do
+                  broadcast_to_channel({:outgoing, "MODE #{mode_item} #{resultstring}", "#{nick}!#{user}@#{hostname}"}, mode_item)
+                end
+                {nick, [], "elixIRC"}
               {:return, spec_modes} ->
-                {nick, ["324 #{nick}!<user>@<hostname> #{mode_item} +#{spec_modes}"], "elixIRC"}
+                created = Elixirc.ChannelState.get_created_time({:via, Registry, {Registry.ChannelState, mode_item}})
+                {nick, ["324 #{nick} #{mode_item} +#{spec_modes}", "329 #{nick} #{mode_item} #{created}"], "elixIRC"}
             end
-          _ ->
-            {nick, ["401 #{nick}!<user>@<hostname> :No such nick/channel"], "elixIRC"}
         end
       mode_nick ->
         case Registry.lookup(Registry.Connections, nick) do
@@ -103,7 +119,7 @@ defmodule Elixirc.Commands do
                 result = Elixirc.Connections.change_user_mode({:via, Registry, {Registry.Connections, mode_nick}}, modestring)
                 case result do
                   {:ok, nil} -> 
-                    {nick, ["MODE #{nick} #{modestring}"], "#{nick}!<user>@<hostname>"}
+                    {nick, ["MODE #{nick} :#{modestring}"], "elixIRC"}
                   {:return, spec_modes} ->
                     Logger.info(spec_modes)
                     {nick, ["221 #{nick} +#{spec_modes}"], "elixIRC"}
@@ -137,6 +153,11 @@ defmodule Elixirc.Commands do
   
   def handle_quit(nick, socket) do
   	name = {:via, Registry, {Registry.Connections, nick}}
+    user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
+    hostname = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
+    channels = Registry.keys(Registry.Channels, self())
+    broadcast_to_all({:outgoing, "QUIT :Client Quit", "#{nick}!#{user}@#{hostname}"}, channels)
+    Enum.each(channels, fn x -> Registry.unregister(Registry.Channels, x) end)
   	Elixirc.write_lines(Responses.message_quit(), socket, name, "<nick>!<user>@<hostname>")
   	Elixirc.write_lines(Responses.response_quit(), socket, name, "")
   	Elixirc.Connections.close(name)
@@ -146,7 +167,9 @@ defmodule Elixirc.Commands do
   def handle_part(nick, [channelname | tail] = _channels) do
     [{pid, _}] = Registry.lookup(Registry.Connections, nick)
     case Registry.lookup(Registry.Channels, channelname) do
-      [{_,_}] ->
+      [] ->
+        {:error, "403 #{nick} #{channelname} :No such channel"}
+      _ ->
         users = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channelname}}, :users)
         if Enum.find(users, fn x -> x == nick end) != nil do
           Registry.unregister_match(Registry.Channels, channelname, pid)
@@ -157,8 +180,6 @@ defmodule Elixirc.Commands do
         else
           {:error, "442 #{nick} #{channelname} :You're not on that channel"}
         end
-      _ ->
-        {:error, "403 #{nick} #{channelname} :No such channel"}
     end
   end
 
@@ -168,6 +189,39 @@ defmodule Elixirc.Commands do
 
   def handle_unknown(nick, cmd) do
   	{nick, Responses.response_unknown(cmd), "elixIRC"}
+  end
+
+  def handle_privmsg(nick, target, message) do
+    case target do
+      "#"<>_channel ->
+        targets = Registry.lookup(Registry.Channels, target)
+        Enum.each(targets, fn {pid, _} -> 
+          if pid != self() do
+            send pid, message
+          end
+        end)
+      _ ->
+        {_, pid} = Registry.lookup(Registry.Connections, target)
+        send pid, message
+    end
+    {nick, [], "elixIRC"}
+  end
+
+  def broadcast_to_channel(message, channel) do
+    Enum.each(Registry.lookup(Registry.Channels, channel), fn {pid, _} -> 
+      send pid, message 
+    end)
+  end
+
+  def broadcast_to_all(message, channels) do
+    broadcastlist = build_broadcast_list(channels)
+    Enum.each(broadcastlist, fn pid -> send pid, message end)
+  end
+
+  def build_broadcast_list(channels) do
+    MapSet.new(List.flatten(Enum.map(channels, fn name -> Registry.lookup(Registry.Channels, name) end)), fn {pid, _} -> 
+      pid 
+    end)
   end
 
 end

@@ -1,5 +1,6 @@
 defmodule Elixirc.ChannelListener do
 	use Task, restart: :permanent
+	require Logger
 
 	def start_link(arg) do
     Task.start_link(__MODULE__, :run, [arg])
@@ -24,7 +25,7 @@ defmodule Elixirc.ChannelListener do
 						Elixirc.ChannelState.adduser(name, nick)
 						send pid, {:outgoing, message_join(key), "#{nick}!#{user}@#{host}"}
 						send pid, {:outgoing, "MODE #{key} +ns", "elixIRC"}
-						send pid, {:outgoing, rpl_namereply(name, nick, key)}
+						send pid, {:outgoing, rpl_namereply(name, nick, key), "elixIRC"}
 						send pid, {:outgoing, message_endnames(nick, key), "elixIRC"}
 					_ ->
 						nick = Elixirc.Connections.get(value, :nick)
@@ -35,33 +36,25 @@ defmodule Elixirc.ChannelListener do
 						send pid, {:outgoing, rpl_namereply(name, nick, key), "elixIRC"}
 						send pid, {:outgoing, message_endnames(nick, key), "elixIRC"}
 				end
-			{:unregister, _registry, key, pid, value} ->
+			{:unregister, _registry, key, _pid, value} ->
 				name = {:via, Registry, {Registry.ChannelState, key}}
 				case Registry.lookup(Registry.Channels, key) do
 					[] ->
 						Elixirc.ChannelState.close(name)
-						nick = Elixirc.Connections.get(value, :nick)
-						user = Elixirc.Connections.get(value, :user)
-						host = Elixirc.Connections.get(value, :host)
-						send pid, {:outgoing, message_part(key), "#{nick}!#{user}@#{host}"}
 					_ ->
 						nick = Elixirc.Connections.get(value, :nick)
-						user = Elixirc.Connections.get(value, :user)
-						host = Elixirc.Connections.get(value, :host)
 						Elixirc.ChannelState.removeuser(name, nick)
-						send pid, {:outgoing, message_part(key), "#{nick}!#{user}@#{host}"}
 				end
 		end
 		listen()
 	end
 
 	defp rpl_namereply(channelstate, nick, channelname) do
-		#TODO Implement Logic to chekc if channel is public or secret!
 		owner = Elixirc.ChannelState.get(channelstate, :owner)
 		#TODO Break this up as this will be too much for one command at some point
 		users = Enum.join(Elixirc.ChannelState.get(channelstate, :users), " ") |> String.replace(owner, "@"<>owner)
 		cond do
-			MapSet.member?(Elixirc.ChannelState.get(channelstate,:modes), :s) ->
+			MapSet.member?(Elixirc.ChannelState.get(channelstate,:modes), "s") ->
 				 "353 #{nick} @ #{channelname} :#{users}"
 			true ->
 				"353 #{nick} = #{channelname} :#{users}"
