@@ -123,7 +123,7 @@ defmodule Elixirc.Commands do
         {nick, ["366 #{nick} * :End of /NAMES list"], "elixIRC"}
       _ ->
         channel = hd(channel_list)
-        result = Registry.lookup(Registry.Channels, channel)
+        _result = Registry.lookup(Registry.Channels, channel)
         case Registry.lookup(Registry.Channels, channel) do 
           [] ->
             {nick, ["403 #{nick} #{channel} :No such channel"], "elixIRC"}
@@ -149,13 +149,23 @@ defmodule Elixirc.Commands do
     end
   end
 
-  def handle_join(nick, channelname) do
+  def handle_join(_nick, [] = _channelname) do
+    {:ok, "no channels"}
+  end
+
+  def handle_join(nick, [head|tail] = _channel) do
     [{pid, _}] = Registry.lookup(Registry.Connections, nick)
     channels = Registry.keys(Registry.Channels, self())
-    if Enum.member?(channels, channelname) == false do 
-      Registry.register(Registry.Channels, channelname, pid)
+    return = if Enum.member?(channels, head) == false do 
+      Registry.register(Registry.Channels, head, pid)
+      case handle_join(nick, tail) do
+        {:ok, _} -> {:ok, "good"}
+        {:err, msg} -> {:err, msg}
+      end
+      else
+        {:err, "403 #{nick} #{head} :No such channel"}
     end
-    {nick, [], "elixIRC"}
+    return
   end
 
   def handle_mode(nick, mode_item, modestring) do
@@ -265,14 +275,14 @@ defmodule Elixirc.Commands do
       [] ->
         {:error, "403 #{nick} #{channelname} :No such channel"}
       _ ->
-        user = user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
+        user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
         host = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
         users = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channelname}}, :users)
         if Enum.find(users, fn x -> x == nick end) != nil do
           broadcast_to_channel({:outgoing, "PART #{channelname}", "#{nick}!#{user}@#{host}"}, channelname)
           leave_channels(nick, [channelname])
           case handle_part(nick, tail) do
-            {:ok, "no channels"} -> {:ok, "good"}
+            {:ok, _} -> {:ok, "good"}
             {:error, msg} -> {:error, msg}
           end
         else
