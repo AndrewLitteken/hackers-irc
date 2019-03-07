@@ -174,7 +174,7 @@ defmodule Elixirc do
         hostname
       {:error, _error} ->
         Logger.info("Falling back to ip address")
-        Enum.join(Tuple.to_list(ip), ".")
+        [Enum.join(Tuple.to_list(ip), ".")]
     end
   end
 

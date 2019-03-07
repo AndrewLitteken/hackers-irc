@@ -70,7 +70,7 @@ defmodule Elixirc.Commands do
           _ ->
             owner = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channel}}, :owner)
             modes = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channel}}, :modes)
-            if owner == nick or MapSet.member?(modes, :t) do
+            if owner == nick or not MapSet.member?(modes, "t") do
               Elixirc.ChannelState.put({:via, Registry, {Registry.ChannelState, channel}}, :topic, topic)
               {:ok, "332 #{nick} #{channel} :#{topic}"}
             else
@@ -115,22 +115,24 @@ defmodule Elixirc.Commands do
     end
   end
 
-  def handle_names(nick, channel) do
-    case channel do
+  def handle_names(nick, channel_list) do
+    case channel_list do
       [] ->
         user_list = Registry.keys(Registry.Connections, self())
         Logger.info(inspect(user_list))
         {nick, ["400 #{nick} :This just won't work right now"], "elixIRC"}
       _ ->
+        channel = hd(channel_list)
+        result = Registry.lookup(Registry.Channels, channel)
         case Registry.lookup(Registry.Channels, channel) do 
           [] ->
             {nick, ["403 #{nick} #{channel} :No such channel"], "elixIRC"}
           _ ->
             channel_modes = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channel}}, :modes)
             users = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channel}}, :users)
-            if not MapSet.member?(channel_modes, :s) or MapSet.member?(users, nick) do
+            if not MapSet.member?(channel_modes, "s") or MapSet.member?(users, nick) do
               message = "353 #{nick}"
-              message = if MapSet.member?(channel_modes, :s) do
+              message = if MapSet.member?(channel_modes, "s") do
                 message <> " @ "
               else
                 message <> " = "
