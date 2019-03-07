@@ -48,6 +48,27 @@ defmodule Elixirc.Commands do
         end
     end
   end
+  
+  def handle_topic(nick, channel, topic) do
+    case Registry.lookup(Registry.Channels, channel) do
+      [] ->
+        {nick, ["403 #{nick} #{channel} :No such channel"], "elixIRC"}
+      _ ->
+        case topic do
+          nil -> 
+            curr_topic = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channel}}, :topic)
+            case curr_topic do
+              "" ->
+                {nick, ["332 #{nick} #{channel} :#{curr_topic}"], "elixIRC"}
+              _ ->
+                {nick, ["331 #{nick} #{channel} :No topic is set"], "elixIRC"}
+            end
+          _ ->
+            Elixirc.ChannelState.put({:via, Registry, {Registry.ChannelState, channel}}, :topic, topic)
+            {nick, ["332 #{nick} #{channel} #{topic}"], "elixIRC"}
+        end
+    end
+  end 
 
   def handle_user("" = _nick, username, realname) do
     temp_nick = generate_good_nick()
@@ -58,6 +79,7 @@ defmodule Elixirc.Commands do
     Elixirc.Connections.put(name, :nick, temp_nick)
     {temp_nick, [], "elixIRC"}
   end
+
 
   def handle_user(nick, username, realname) do
     name = {:via, Registry, {Registry.Connections, nick}}
