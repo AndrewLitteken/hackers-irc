@@ -98,7 +98,7 @@ defmodule Elixirc do
             {nick, Elixirc.Responses.response_nosuchchannel(mapping[:params]), "elixIRC"}
         end
       "PART" ->
-        result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^#[^: ]+(,#[^: ]+)*$"}, {:option, {:pattern, ".*"}}]
+        result = Elixirc.Validate.validate mapping[:params], [{:pattern, "^#[^: ,]+(,#[^: ]+)*$"}, {:option, {:pattern, ".*"}}]
         case result do
           {:ok, _} ->
             [head|_tail] = mapping[:params]
@@ -109,6 +109,13 @@ defmodule Elixirc do
           {:error, msg} ->
             {nick, [msg], "elixIRC"}
         end
+      "TOPIC" ->
+        result = Elixirc.Validate.validate mapping[:params], [{:pattern, "#[^: ,]+"}, {:option, {:pattern, ".*"}}]
+        {:ok, _} ->
+          [head|tail] = mapping[:params]
+          Commands.handle_topic(nick, head, tail)
+        {:error, msg} ->
+          {nick, [msg], "elixIRC"}
       "PRIVMSG" ->
         result = Elixirc.Validate.validate mapping[:params], [{:pattern, ".*"}, {:pattern, ".*"}]
         case result do
