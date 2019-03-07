@@ -39,9 +39,13 @@ defmodule Elixirc.ChannelListener do
 						nick = Elixirc.Connections.get(value, :nick)
 						user = Elixirc.Connections.get(value, :user)
 						host = Elixirc.Connections.get(value, :host)
+						topic = Elixirc.ChannelState.get(name, :topic)
 						Elixirc.ChannelState.adduser(name, nick)
 						Enum.each(Registry.lookup(Registry.Channels, key), fn {pid, _value} -> send pid, {:outgoing, message_join(key), "#{nick}!#{user}@#{host}"} end)
 						send pid, {:outgoing, rpl_namereply(name, nick, key), "elixIRC"}
+						if (topic != "") do
+							send pid, {:outgoing, rpl_topic(nick, key, topic), "elixIRC"}
+						end
 						send pid, {:outgoing, message_endnames(nick, key), "elixIRC"}
 				end
 			{:unregister, _registry, key, _pid} ->
@@ -76,6 +80,10 @@ defmodule Elixirc.ChannelListener do
 
 	defp message_endnames(nick, channelname) do
 		"366 #{nick} #{channelname} :End of /NAMES list."
+	end
+
+	defp rpl_topic(nick, key, topic) do
+		"332 #{nick} #{key} :#{topic}"
 	end
 
 
