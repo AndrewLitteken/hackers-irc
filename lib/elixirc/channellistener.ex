@@ -1,5 +1,5 @@
 defmodule Elixirc.ChannelListener do
-	use Task, restart: :temporary
+	use Task, restart: :permanent
 	require Logger
 
 	def start_link(arg) do
@@ -14,11 +14,17 @@ defmodule Elixirc.ChannelListener do
 	def listen() do
 		receive do
 			{:register, _registry, key, pid, value} ->
-				Process.monitor(pid)
 				name = {:via, Registry, {Registry.ChannelState, key}}
 				case Registry.lookup(Registry.Channels, key) do
 					[{_,_}] ->
-						{:ok, _} = DynamicSupervisor.start_child(Elixirc.ChannelsSupervisor, Elixirc.ChannelState.child_spec(name: name))
+						case DynamicSupervisor.start_child(Elixirc.ChannelsSupervisor, Elixirc.ChannelState.child_spec(name: name)) do
+							{:error, {:already_started, _}} -> 
+								Elixirc.ChannelState.close(name)
+								DynamicSupervisor.start_child(Elixirc.ChannelsSupervisor, Elixirc.ChannelState.child_spec(name: name))
+								Logger.info("Channel State Restarted")
+							_ ->
+								Logger.info("Channel State Created")
+						end
 						nick = Elixirc.Connections.get(value, :nick)
 						user = Elixirc.Connections.get(value, :user)
 						host = Elixirc.Connections.get(value, :host)
@@ -43,15 +49,6 @@ defmodule Elixirc.ChannelListener do
 					[] ->
 						Elixirc.ChannelState.close(name)
 				end
-			{:DOWN, _ref, :process, pid, _reason} ->
-				channels = Registry.keys(Registry.Channels, pid)
-				[{_, nickpid}] = Enum.filter(Registry.lookup(Registry.Channels, List.first(channels)), fn {newpid, _} -> newpid === pid end)
-				nick = Elixirc.Connections.get(nickpid, :nick)
-				Enum.each(channels, fn chan -> 
-      				Elixirc.ChannelState.removeuser({:via, Registry, {Registry.ChannelState, chan}}, nick)
-      				Registry.unregister_match(Registry.Channels, chan, nickpid)
-    			end)
-    			Elixirc.Connections.close({:via, Registry, {Registry.Connections, nick}})
 			anything_else ->
 				Logger.info(inspect(anything_else))
 		end

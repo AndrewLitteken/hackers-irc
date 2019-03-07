@@ -4,7 +4,7 @@ defmodule Elixirc.Commands do
 
 	def handle_nick(new_nick, "" = _old_nick, hostname) do
     name = {:via, Registry, {Registry.Connections, new_nick, self()}}
-    DynamicSupervisor.start_child(Elixirc.ConnectionsSupervisor, Elixirc.Connections.child_spec(name: name))
+    Elixirc.Connections.start_link([name: name])
     |> case do
       {:ok, _pid} -> 
         Elixirc.Connections.put(name, :nick, new_nick)
@@ -83,7 +83,7 @@ defmodule Elixirc.Commands do
   def handle_user("" = _nick, username, realname) do
     temp_nick = generate_good_nick()
     name = {:via, Registry, {Registry.Connections, temp_nick, self()}}
-    {:ok, _} = DynamicSupervisor.start_child(Elixirc.ConnectionsSupervisor, Elixirc.Connections.child_spec(name: name))
+    {:ok, _} = Elixirc.Connections.start_link([name: name])
     Elixirc.Connections.put(name, :user, "~"<>username)
     Elixirc.Connections.put(name, :realname, realname)
     Elixirc.Connections.put(name, :nick, temp_nick)
