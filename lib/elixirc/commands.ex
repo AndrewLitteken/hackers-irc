@@ -105,9 +105,9 @@ defmodule Elixirc.Commands do
 
   defp add_users_to_message(message, [head | tail], chan_owner) do
     message = if head == chan_owner do
-        message <> " @"<>head
+        message <> "@"<>head <> " "
       else
-        message <> " " <> head
+        message <> "" <> head <> " "
     end
     case tail do
       [] -> message
@@ -290,19 +290,36 @@ defmodule Elixirc.Commands do
   end
 
   def handle_privmsg(nick, target, message) do
-    case target do
+    return = case target do
       "#"<>_channel ->
-        targets = Registry.lookup(Registry.Channels, target)
-        Enum.each(targets, fn {pid, _} -> 
-          if pid != self() do
-            send pid, message
-          end
-        end)
+        case Registry.lookup(Registry.Channels, target) do
+          [] ->
+            {nick, ["403 #{nick} #{target} :No such channel"], "elixIRC"}
+          _ ->
+            chan_modes = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, target}}, :modes)
+            users = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, target}}, :users)
+            if not MapSet.member?(chan_modes, "n") or (MapSet.member?(chan_modes, "n") and MapSet.member?(users, nick)) do 
+              targets = Registry.lookup(Registry.Channels, target)
+              Enum.each(targets, fn {pid, _} -> 
+                if pid != self() do
+                  send pid, message
+                end
+              end)
+              {:ok, nil}
+            else
+              {nick, ["404 #{nick} #{target} :Cannot send to channel"], "elixIRC"}
+            end
+        end
       _ ->
         {_, pid} = Registry.lookup(Registry.Connections, target)
         send pid, message
+        {:ok, nil}
     end
-    {nick, [], "elixIRC"}
+    case return do
+      {:ok, _} ->
+        {nick, [], "elixIRC"}
+      _ -> return
+    end
   end
 
   def broadcast_to_channel(message, channel) do
