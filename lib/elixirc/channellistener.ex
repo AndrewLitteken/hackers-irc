@@ -14,6 +14,7 @@ defmodule Elixirc.ChannelListener do
 	def listen() do
 		receive do
 			{:register, _registry, key, pid, value} ->
+				Process.monitor(pid)
 				name = {:via, Registry, {Registry.ChannelState, key}}
 				case Registry.lookup(Registry.Channels, key) do
 					[{_,_}] ->
@@ -41,10 +42,16 @@ defmodule Elixirc.ChannelListener do
 				case Registry.lookup(Registry.Channels, key) do
 					[] ->
 						Elixirc.ChannelState.close(name)
-					_ ->
-						nick = Elixirc.Connections.get(value, :nick)
-						Elixirc.ChannelState.removeuser(name, nick)
 				end
+			{:DOWN, _ref, :process, pid, _reason} ->
+				channels = Registry.keys(Registry.Channels, pid)
+				[{_, nickpid}] = Enum.filter(Registry.lookup(Registry.Channels, List.first(channels)), fn {newpid, _} -> newpid === pid end)
+				nick = Elixirc.Connections.get(nickpid, :nick)
+				Enum.each(channels, fn chan -> 
+      				Elixirc.ChannelState.removeuser({:via, Registry, {Registry.ChannelState, chan}}, nick)
+      				Registry.unregister_match(Registry.Channels, chan, nickpid)
+    			end)
+    			Elixirc.Connections.close({:via, Registry, {Registry.Connections, nick}})
 			anything_else ->
 				Logger.info(inspect(anything_else))
 		end
@@ -69,10 +76,6 @@ defmodule Elixirc.ChannelListener do
 
 	defp message_endnames(nick, channelname) do
 		"366 #{nick} #{channelname} :End of /NAMES list."
-	end
-
-	defp message_part(channelname) do
-		"PART #{channelname}"
 	end
 
 

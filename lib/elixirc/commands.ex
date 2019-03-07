@@ -4,7 +4,7 @@ defmodule Elixirc.Commands do
 
 	def handle_nick(new_nick, "" = _old_nick, hostname) do
     name = {:via, Registry, {Registry.Connections, new_nick, self()}}
-    Elixirc.Connections.start_link([name: name])
+    DynamicSupervisor.start_child(Elixirc.ConnectionsSupervisor, Elixirc.Connections.child_spec(name: name))
     |> case do
       {:ok, _pid} -> 
         Elixirc.Connections.put(name, :nick, new_nick)
@@ -52,7 +52,7 @@ defmodule Elixirc.Commands do
   def handle_user("" = _nick, username, realname) do
     temp_nick = generate_good_nick()
     name = {:via, Registry, {Registry.Connections, temp_nick, self()}}
-    {:ok, _pid} = Elixirc.Connections.start_link([name: name])
+    {:ok, _} = DynamicSupervisor.start_child(Elixirc.ConnectionsSupervisor, Elixirc.Connections.child_spec(name: name))
     Elixirc.Connections.put(name, :user, "~"<>username)
     Elixirc.Connections.put(name, :realname, realname)
     Elixirc.Connections.put(name, :nick, temp_nick)
@@ -165,14 +165,16 @@ defmodule Elixirc.Commands do
   end
 
   def handle_part(nick, [channelname | tail] = _channels) do
-    [{pid, _}] = Registry.lookup(Registry.Connections, nick)
     case Registry.lookup(Registry.Channels, channelname) do
       [] ->
         {:error, "403 #{nick} #{channelname} :No such channel"}
       _ ->
+        user = user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
+        host = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
         users = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channelname}}, :users)
         if Enum.find(users, fn x -> x == nick end) != nil do
-          Registry.unregister_match(Registry.Channels, channelname, pid)
+          broadcast_to_channel({:outgoing, "PART #{channelname}", "#{nick}!#{user}@#{host}"}, channelname)
+          leave_channels(nick, [channelname])
           case handle_part(nick, tail) do
             {:ok, "no channels"} -> {:ok, "good"}
             {:error, msg} -> {:error, msg}
@@ -218,9 +220,16 @@ defmodule Elixirc.Commands do
     Enum.each(broadcastlist, fn pid -> send pid, message end)
   end
 
-  def build_broadcast_list(channels) do
+  defp build_broadcast_list(channels) do
     MapSet.new(List.flatten(Enum.map(channels, fn name -> Registry.lookup(Registry.Channels, name) end)), fn {pid, _} -> 
       pid 
+    end)
+  end
+
+  def leave_channels(nick, channels) do
+    Enum.each(channels, fn chan -> 
+      Elixirc.ChannelState.removeuser({:via, Registry, {Registry.ChannelState, chan}}, nick)
+      Registry.unregister(Registry.Channels, chan)
     end)
   end
 

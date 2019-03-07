@@ -6,6 +6,7 @@ defmodule Elixirc.Application do
 		children = [
 			{Task.Supervisor, name: Elixirc.TaskSupervisor},
 			{DynamicSupervisor, name: Elixirc.ChannelsSupervisor, strategy: :one_for_one},
+			{DynamicSupervisor, name: Elixirc.ConnectionsSupervisor, strategy: :one_for_one},
 			{Registry, keys: :unique, name: Registry.ChannelState},
 			{Registry, keys: :unique, name: Registry.Connections},
 			{Elixirc.ChannelListener, name: :ChannelListener},

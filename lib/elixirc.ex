@@ -30,12 +30,8 @@ defmodule Elixirc do
           user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
           hostname = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
           channels = Registry.keys(Registry.Channels, self())
-          broadcastlist = MapSet.new(List.flatten(Enum.map(channels, fn name -> Registry.lookup(Registry.Channels, name) end)), fn x -> 
-            {pid, _} = x 
-            pid 
-          end)
-          Enum.each(broadcastlist, fn pid -> send pid, {:outgoing, "QUIT :Remote host closed the connection", "#{nick}!#{user}@#{hostname}"} end)
-          Enum.each(channels, fn x -> Registry.unregister(Registry.Channels, x) end)
+          Commands.broadcast_to_all({:outgoing, "QUIT :Remote host closed the connection", "#{nick}!#{user}@#{hostname}"}, channels)
+          Commands.leave_channels(nick, channels)
           Elixirc.Connections.close({:via, Registry, {Registry.Connections, nick}})
         end
         Logger.info("Socket Closed")
@@ -48,13 +44,9 @@ defmodule Elixirc do
           user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
           hostname = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
           channels = Registry.keys(Registry.Channels, self())
-          broadcastlist = MapSet.new(List.flatten(Enum.map(channels, fn name -> Registry.lookup(Registry.Channels, name) end)), fn x -> 
-            {pid, _} = x 
-            pid 
-          end)
           reason = Atom.to_string(error)
-          Enum.each(broadcastlist, fn pid -> send pid, {:outgoing, "QUIT :#{reason}", "#{nick}!#{user}@#{hostname}"} end)
-          Enum.each(channels, fn x -> Registry.unregister(Registry.Channels, x) end)
+          Commands.broadcast_to_all({:outgoing, "QUIT :#{reason}", "#{nick}!#{user}@#{hostname}"}, channels)
+          Commands.leave_channels(nick, channels)
           Elixirc.Connections.close({:via, Registry, {Registry.Connections, nick}})
         end
         Logger.info(["Socket Crashed with exit code ", inspect(error)])
@@ -103,7 +95,7 @@ defmodule Elixirc do
           {:ok, _} ->
             [head|_tail] = mapping[:params]
             case Commands.handle_part(nick, String.split(head, ",")) do
-              {:ok, _} -> {nick, ["PART #{head}"], "#{nick}!<user>@<hostname>"}
+              {:ok, _} -> {nick, [], "elixIRC"}
               {:error, msg} -> {nick, [msg], "elixIRC"}
             end
           {:error, msg} ->
