@@ -85,7 +85,11 @@ defmodule Elixirc do
         case result do
           {:ok, _} ->
             [head|_tail] = mapping[:params]
-            Commands.handle_join(nick, head)
+            result = Commands.handle_join(nick, String.split(head, ","))
+            case result do
+              {:ok, _} -> {nick, [], "elixIRC"}
+              {:err, msg} -> {nick, [msg], "elixIRC"}
+            end
           {:error, _} ->
             {nick, Elixirc.Responses.response_nosuchchannel(mapping[:params]), "elixIRC"}
         end
