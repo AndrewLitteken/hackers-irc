@@ -1,5 +1,5 @@
 defmodule Elixirc.ChannelListener do
-	use Task, restart: :permanent
+	use Task, restart: :temporary
 	require Logger
 
 	def start_link(arg) do
