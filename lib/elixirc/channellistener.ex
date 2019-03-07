@@ -24,6 +24,7 @@ defmodule Elixirc.ChannelListener do
 								Logger.info("Channel State Restarted")
 							_ ->
 								Logger.info("Channel State Created")
+								{:ok}
 						end
 						nick = Elixirc.Connections.get(value, :nick)
 						user = Elixirc.Connections.get(value, :user)
@@ -48,6 +49,8 @@ defmodule Elixirc.ChannelListener do
 				case Registry.lookup(Registry.Channels, key) do
 					[] ->
 						Elixirc.ChannelState.close(name)
+					_ -> 
+						{:ok}
 				end
 			anything_else ->
 				Logger.info(inspect(anything_else))
