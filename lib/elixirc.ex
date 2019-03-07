@@ -134,7 +134,18 @@ defmodule Elixirc do
           {:error, msg} ->
             {nick, [msg], "elixIRC"}
         end
-
+      "NOTICE" ->
+        result = Elixirc.Validate.validate mapping[:params], [{:pattern, ".*"}, {:pattern, ".*"}]
+        case result do
+          {:ok, _} ->
+            [target|data] = mapping[:params]
+            Logger.info("Message is #{data}")
+            user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
+            host = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
+            Commands.handle_privmsg(nick, target, {:outgoing, "NOTICE #{target} :"<>hd(data), "#{nick}!#{user}@#{host}"})
+          {:error, msg} ->
+            {nick, [msg], "elixIRC"}
+        end
       "PING" -> {nick, Commands.pong(hd(mapping[:params])), "elixIRC"}
       "PONG" ->
         Logger.info("Received PONG from Client - Doing nothing about this at the moment")
