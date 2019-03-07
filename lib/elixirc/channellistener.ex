@@ -1,5 +1,5 @@
 defmodule Elixirc.ChannelListener do
-	use Task, restart: :temporary
+	use Task, restart: :permanent
 	require Logger
 
 	def start_link(arg) do
@@ -14,11 +14,18 @@ defmodule Elixirc.ChannelListener do
 	def listen() do
 		receive do
 			{:register, _registry, key, pid, value} ->
-				Process.monitor(pid)
 				name = {:via, Registry, {Registry.ChannelState, key}}
 				case Registry.lookup(Registry.Channels, key) do
 					[{_,_}] ->
-						{:ok, _} = DynamicSupervisor.start_child(Elixirc.ChannelsSupervisor, Elixirc.ChannelState.child_spec(name: name))
+						case DynamicSupervisor.start_child(Elixirc.ChannelsSupervisor, Elixirc.ChannelState.child_spec(name: name)) do
+							{:error, {:already_started, _}} -> 
+								Elixirc.ChannelState.close(name)
+								DynamicSupervisor.start_child(Elixirc.ChannelsSupervisor, Elixirc.ChannelState.child_spec(name: name))
+								Logger.info("Channel State Restarted")
+							_ ->
+								Logger.info("Channel State Created")
+								{:ok}
+						end
 						nick = Elixirc.Connections.get(value, :nick)
 						user = Elixirc.Connections.get(value, :user)
 						host = Elixirc.Connections.get(value, :host)
@@ -32,9 +39,13 @@ defmodule Elixirc.ChannelListener do
 						nick = Elixirc.Connections.get(value, :nick)
 						user = Elixirc.Connections.get(value, :user)
 						host = Elixirc.Connections.get(value, :host)
+						topic = Elixirc.ChannelState.get(name, :topic)
 						Elixirc.ChannelState.adduser(name, nick)
 						Enum.each(Registry.lookup(Registry.Channels, key), fn {pid, _value} -> send pid, {:outgoing, message_join(key), "#{nick}!#{user}@#{host}"} end)
 						send pid, {:outgoing, rpl_namereply(name, nick, key), "elixIRC"}
+						if (topic != "") do
+							send pid, {:outgoing, rpl_topic(nick, key, topic), "elixIRC"}
+						end
 						send pid, {:outgoing, message_endnames(nick, key), "elixIRC"}
 				end
 			{:unregister, _registry, key, _pid} ->
@@ -42,16 +53,9 @@ defmodule Elixirc.ChannelListener do
 				case Registry.lookup(Registry.Channels, key) do
 					[] ->
 						Elixirc.ChannelState.close(name)
+					_ -> 
+						{:ok}
 				end
-			{:DOWN, _ref, :process, pid, _reason} ->
-				channels = Registry.keys(Registry.Channels, pid)
-				[{_, nickpid}] = Enum.filter(Registry.lookup(Registry.Channels, List.first(channels)), fn {newpid, _} -> newpid === pid end)
-				nick = Elixirc.Connections.get(nickpid, :nick)
-				Enum.each(channels, fn chan -> 
-      				Elixirc.ChannelState.removeuser({:via, Registry, {Registry.ChannelState, chan}}, nick)
-      				Registry.unregister_match(Registry.Channels, chan, nickpid)
-    			end)
-    			Elixirc.Connections.close({:via, Registry, {Registry.Connections, nick}})
 			anything_else ->
 				Logger.info(inspect(anything_else))
 		end
@@ -76,6 +80,10 @@ defmodule Elixirc.ChannelListener do
 
 	defp message_endnames(nick, channelname) do
 		"366 #{nick} #{channelname} :End of /NAMES list."
+	end
+
+	defp rpl_topic(nick, key, topic) do
+		"332 #{nick} #{key} :#{topic}"
 	end
 
 

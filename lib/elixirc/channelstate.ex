@@ -1,5 +1,5 @@
 defmodule Elixirc.ChannelState do
-	use Agent, restart: :permanent
+	use Agent, restart: :temporary
 	require Logger
 
 	defstruct name: "", modes: MapSet.new(["s", "n"]), topic: "", owner: "", users: MapSet.new(), created: DateTime.utc_now()
