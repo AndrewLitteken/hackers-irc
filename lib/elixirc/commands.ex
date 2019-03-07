@@ -120,7 +120,7 @@ defmodule Elixirc.Commands do
       [] ->
         user_list = Registry.keys(Registry.Connections, self())
         Logger.info(inspect(user_list))
-        {nick, ["400 #{nick} :This just won't work right now"], "elixIRC"}
+        {nick, ["366 #{nick} * :End of /NAMES list"], "elixIRC"}
       _ ->
         channel = hd(channel_list)
         result = Registry.lookup(Registry.Channels, channel)
