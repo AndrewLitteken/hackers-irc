@@ -8,7 +8,7 @@ defmodule Elixirc.Responses do
       "001 <nick> :Welcome to the elixIRC Network <nick>",
       "002 <nick> :Your host is elixIRC, running version elixIRC-v0.1",
       "003 <nick> :This server was created #{@server_start_date.month}-#{@server_start_date.day}-#{@server_start_date.year} at #{@server_start_date.hour}:#{@server_start_date.minute}:#{@server_start_date.second} UTC",
-      "004 <nick> elixIRC elixIRC-v0.1 Oiosw imstn",
+      "004 <nick> elixIRC elixIRC-v0.1 io stn",
       "005 <nick> AWAYLEN=307 CASEMAPPING=ascii CHANLIMIT=#:25 CHANMODES=,,,imstn CHANNELLEN=32 CHANTYPES=# ELIST HOSTLEN=64 KICKLEN=307 NETWORK=HackersNode PREFIX=(o)@ STATUSMSG=@ CHARSET=utf-8 :are supported by this server",
       "005 <nick> TOPICLEN=307 USERLEN=15 :are supppored by this server"
     ] ++ response_LUSERS() ++ response_MOTD()
