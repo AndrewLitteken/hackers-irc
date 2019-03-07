@@ -127,6 +127,7 @@ defmodule Elixirc do
         case result do
           {:ok, _} ->
             [target|data] = mapping[:params]
+            Logger.info("Message is #{data}")
             user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
             host = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
             Commands.handle_privmsg(nick, target, {:outgoing, "PRIVMSG #{target} :"<>hd(data), "#{nick}!#{user}@#{host}"})
