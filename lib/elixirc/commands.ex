@@ -311,7 +311,7 @@ defmodule Elixirc.Commands do
             end
         end
       _ ->
-        {_, pid} = Registry.lookup(Registry.Connections, target)
+        [{_, pid}] = Registry.lookup(Registry.Connections, target)
         send pid, message
         {:ok, nil}
     end
