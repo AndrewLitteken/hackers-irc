@@ -143,11 +143,19 @@ defmodule Elixirc do
         case result do
           {:ok, _} ->
             [head|tail] = mapping[:params]
-            Logger.info(inspect(tail))
             Commands.handle_mode(nick, head, List.first(tail))
           {:error, _} ->
             {nick, ["400 #{nick}!<user>@<hostname> :Unknown error for MODE"], "elixIRC"}
         end
+      "NAMES" ->
+        result = Elixirc.Validate.validate mapping[:params], [{:option, {:pattern, "#[^: ,]+"}}]
+        Logger.info(inspect(result))
+        case result do
+          {:ok, _} ->
+            Commands.handle_names(nick, mapping[:params])
+          {:error, _} ->
+            {nick, ["400 #{nick}!<user>@<hostname> :Unknown error for NAMES"], "elixIRC"}
+        end  
       "FAIL" -> 1 + []
       "PASS" ->
         Logger.info("Received PASS from Client - Ignoring for now")
