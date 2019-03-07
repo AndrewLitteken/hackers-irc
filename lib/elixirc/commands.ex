@@ -54,18 +54,27 @@ defmodule Elixirc.Commands do
       [] ->
         {nick, ["403 #{nick} #{channel} :No such channel"], "elixIRC"}
       _ ->
+        topic = case topic do
+          ":" <> rest -> rest
+          _ -> topic
+        end
         case topic do
-          nil -> 
+          [] -> 
             curr_topic = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channel}}, :topic)
             case curr_topic do
               "" ->
-                {nick, ["332 #{nick} #{channel} :#{curr_topic}"], "elixIRC"}
+                {:error, {nick, ["331 #{nick} #{channel} :No topic is set"], "elixIRC"}}
               _ ->
-                {nick, ["331 #{nick} #{channel} :No topic is set"], "elixIRC"}
+                {:personal, "332 #{nick} #{channel} :#{curr_topic}"}
             end
           _ ->
-            Elixirc.ChannelState.put({:via, Registry, {Registry.ChannelState, channel}}, :topic, topic)
-            {nick, ["332 #{nick} #{channel} #{topic}"], "elixIRC"}
+            owner = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channel}}, :owner)
+            if owner == nick do
+              Elixirc.ChannelState.put({:via, Registry, {Registry.ChannelState, channel}}, :topic, topic)
+              {:ok, "332 #{nick} #{channel} :#{topic}"}
+            else
+              {:error, {nick, ["482 #{nick} #{channel} :You're not channel operator"], "elixIRC"}}
+            end
         end
     end
   end 
@@ -138,10 +147,28 @@ defmodule Elixirc.Commands do
           [{_pid, _}] ->
             Logger.info(mode_nick)
             if mode_nick == nick do
+                oldmodes = Elixirc.Connections.get({:via, Registry, {Registry.Connections, mode_nick}}, :modes)
                 result = Elixirc.Connections.change_user_mode({:via, Registry, {Registry.Connections, mode_nick}}, modestring)
                 case result do
                   {:ok, nil} -> 
-                    {nick, ["MODE #{nick} :#{modestring}"], "elixIRC"}
+                    newmodes = Elixirc.Connections.get({:via, Registry, {Registry.Connections, mode_nick}}, :modes)
+                    Logger.info(inspect(newmodes))
+                    Logger.info(inspect(oldmodes))
+                    added = MapSet.difference(newmodes, oldmodes)
+                    subtracted = MapSet.difference(oldmodes, newmodes)
+                    resultstring = cond do
+                      MapSet.size(added) > 0 and MapSet.size(subtracted) > 0 -> "+"<>Enum.join(MapSet.to_list(added), "")<>"-"<>Enum.join(MapSet.to_list(subtracted), "")
+                      MapSet.size(added) > 0 -> "+"<>Enum.join(MapSet.to_list(added), "")
+                      MapSet.size(subtracted) > 0 -> "-"<>Enum.join(MapSet.to_list(subtracted), "")
+                      true -> ""
+                    end
+                    user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
+                    hostname = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
+                    if !MapSet.equal?(oldmodes, newmodes) do
+                      {nick, ["MODE #{nick} #{resultstring}"], "#{nick}!#{user}@#{hostname}"}
+                    else
+                      {nick, [], "elixIRC"}
+                    end
                   {:return, spec_modes} ->
                     Logger.info(spec_modes)
                     {nick, ["221 #{nick} +#{spec_modes}"], "elixIRC"}
@@ -150,7 +177,7 @@ defmodule Elixirc.Commands do
               {nick, ["502 #{nick} :Can't change mode for other users"], "elixIRC"}
             end
           _ ->
-            {nick, ["401 #{nick} :No such nick/channel"], "elixIRC"}
+            {nick, ["401 #{nick} :No such nick"], "elixIRC"}
         end
     end
   end

@@ -53,16 +53,20 @@ defmodule Elixirc.Connections do
 				case op do
 					"add" ->
 						modes = Agent.get(connection, &Map.get(&1, :modes))
-						modes = if not MapSet.member?(modes, String.to_atom(String.at(modestring, 0))) do
+						newmodes = if not MapSet.member?(modes, String.to_atom(String.at(modestring, 0))) do
 							MapSet.put(modes, String.to_atom(String.at(modestring, 0)))
 						end
-						Agent.update(connection, &Map.put(&1, :modes, modes))
+						if newmodes != nil do
+							Agent.update(connection, &Map.put(&1, :modes, newmodes))
+						end
 					"sub" ->
 						modes = Agent.get(connection, &Map.get(&1, :modes))
-						modes = if MapSet.member?(modes, String.to_atom(String.at(modestring, 0))) do
+						newmodes = if MapSet.member?(modes, String.to_atom(String.at(modestring, 0))) do
 							MapSet.delete(modes, String.to_atom(String.at(modestring, 0)))
 						end
-						Agent.update(connection, &Map.put(&1, :modes, modes))
+						if newmodes != nil do
+							Agent.update(connection, &Map.put(&1, :modes, newmodes))
+						end
 				end
 				change_user_mode(connection, String.slice(modestring, 1, String.length(modestring)))
 		end

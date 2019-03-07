@@ -103,11 +103,25 @@ defmodule Elixirc do
         end
       "TOPIC" ->
         result = Elixirc.Validate.validate mapping[:params], [{:pattern, "#[^: ,]+"}, {:option, {:pattern, ".*"}}]
-        {:ok, _} ->
-          [head|tail] = mapping[:params]
-          Commands.handle_topic(nick, head, tail)
-        {:error, msg} ->
-          {nick, [msg], "elixIRC"}
+        case result do
+          {:ok, _} ->
+            [head|tail] = mapping[:params]
+            Logger.info(inspect(tail))
+            result_value = Commands.handle_topic(nick, head, tail)
+            user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
+            hostname = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
+            case result_value do
+              {:ok, send_msg} ->
+                Commands.broadcast_to_channel({:outgoing, send_msg, "#{nick}!#{user}@#{hostname}"}, head)
+                {nick, [], "elixIRC"}
+              {:error, msg} -> 
+                msg
+              {:personal, msg} ->
+                {nick, [msg], "elixIRC"}
+            end
+          {:error, _} ->
+            {nick, ["461 #{nick} TOPIC :Not enough parameters"], "elixIRC"}
+        end
       "PRIVMSG" ->
         result = Elixirc.Validate.validate mapping[:params], [{:pattern, ".*"}, {:pattern, ".*"}]
         case result do
@@ -132,7 +146,6 @@ defmodule Elixirc do
             Logger.info(inspect(tail))
             Commands.handle_mode(nick, head, List.first(tail))
           {:error, _} ->
-            #{"", Elixirc.Responses.response_modespec(mapping[:params]), "elixIRC"}
             {nick, ["400 #{nick}!<user>@<hostname> :Unknown error for MODE"], "elixIRC"}
         end
       "FAIL" -> 1 + []
