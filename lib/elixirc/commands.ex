@@ -177,11 +177,11 @@ defmodule Elixirc.Commands do
             {nick, ["403 #{nick} #{mode_item} :No such channel"], "elixIRC"}
           _ ->
             owner = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, mode_item}}, :owner)
-            if owner == nick do
-              oldmodes = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, mode_item}}, :modes)
-              result = Elixirc.ChannelState.change_channel_mode({:via, Registry, {Registry.ChannelState, mode_item}}, modestring)
-              case result do
-                {:ok, nil} ->
+            oldmodes = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, mode_item}}, :modes)
+            result = Elixirc.ChannelState.change_channel_mode({:via, Registry, {Registry.ChannelState, mode_item}}, modestring)
+            case result do
+              {:ok, nil} ->
+                if owner == nick do
                   newmodes = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, mode_item}}, :modes)
                   added = MapSet.difference(newmodes, oldmodes)
                   subtracted = MapSet.difference(oldmodes, newmodes)
@@ -197,12 +197,12 @@ defmodule Elixirc.Commands do
                     broadcast_to_channel({:outgoing, "MODE #{mode_item} #{resultstring}", "#{nick}!#{user}@#{hostname}"}, mode_item)
                   end
                   {nick, [], "elixIRC"}
-                {:return, spec_modes} ->
-                  created = Elixirc.ChannelState.get_created_time({:via, Registry, {Registry.ChannelState, mode_item}})
-                  {nick, ["324 #{nick} #{mode_item} +#{spec_modes}", "329 #{nick} #{mode_item} #{created}"], "elixIRC"}
-              end
-            else
-              {nick, ["482 #{nick} #{mode_item} :You're not channel operator"], "elixIRC"}
+                else
+                  {nick, ["482 #{nick} #{mode_item} :You're not channel operator"], "elixIRC"}
+                end
+              {:return, spec_modes} ->
+                created = Elixirc.ChannelState.get_created_time({:via, Registry, {Registry.ChannelState, mode_item}})
+                {nick, ["324 #{nick} #{mode_item} +#{spec_modes}", "329 #{nick} #{mode_item} #{created}"], "elixIRC"}
             end
         end
       mode_nick ->
