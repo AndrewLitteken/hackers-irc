@@ -123,6 +123,7 @@ defmodule Elixirc.Commands do
         {nick, ["366 #{nick} * :End of /NAMES list"], "elixIRC"}
       _ ->
         channel = hd(channel_list)
+        channel = String.downcase(channel)
         _result = Registry.lookup(Registry.Channels, channel)
         case Registry.lookup(Registry.Channels, channel) do 
           [] ->

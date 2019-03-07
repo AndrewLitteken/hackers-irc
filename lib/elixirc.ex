@@ -67,6 +67,7 @@ defmodule Elixirc do
           {:ok, _} ->
             [key|_tail] = mapping[:params]
             hostname = List.to_string(resolve_hostname(socket))
+            key = String.downcase(key)
             Commands.handle_nick(key, nick, hostname)
           {:error, _}  ->
             {nick, Elixirc.Responses.response_nickspec(mapping[:params]), "elixIRC"}
@@ -85,6 +86,7 @@ defmodule Elixirc do
         case result do
           {:ok, _} ->
             [head|_tail] = mapping[:params]
+            head = String.downcase(head)
             result = Commands.handle_join(nick, String.split(head, ","))
             case result do
               {:ok, _} -> {nick, [], "elixIRC"}
@@ -98,6 +100,7 @@ defmodule Elixirc do
         case result do
           {:ok, _} ->
             [head|_tail] = mapping[:params]
+            head = String.downcase(head)
             case Commands.handle_part(nick, String.split(head, ",")) do
               {:ok, _} -> {nick, [], "elixIRC"}
               {:error, msg} -> {nick, [msg], "elixIRC"}
@@ -111,6 +114,7 @@ defmodule Elixirc do
           {:ok, _} ->
             [head|tail] = mapping[:params]
             Logger.info(inspect(tail))
+            head = String.downcase(head)
             result_value = Commands.handle_topic(nick, head, tail)
             user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
             hostname = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
@@ -132,6 +136,7 @@ defmodule Elixirc do
           {:ok, _} ->
             [target|data] = mapping[:params]
             Logger.info("Message is #{data}")
+            target = String.downcase(target)
             user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
             host = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
             Commands.handle_privmsg(nick, target, {:outgoing, "PRIVMSG #{target} :"<>hd(data), "#{nick}!#{user}@#{host}"})
@@ -144,6 +149,7 @@ defmodule Elixirc do
           {:ok, _} ->
             [target|data] = mapping[:params]
             Logger.info("Message is #{data}")
+            target = String.downcase(target)
             user = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :user)
             host = Elixirc.Connections.get({:via, Registry, {Registry.Connections, nick}}, :host)
             Commands.handle_privmsg(nick, target, {:outgoing, "NOTICE #{target} :"<>hd(data), "#{nick}!#{user}@#{host}"})
@@ -159,6 +165,7 @@ defmodule Elixirc do
         case result do
           {:ok, _} ->
             [head|tail] = mapping[:params]
+            head = String.downcase(head)
             Commands.handle_mode(nick, head, List.first(tail))
           {:error, _} ->
             {nick, ["400 #{nick}!<user>@<hostname> :Unknown error for MODE"], "elixIRC"}
@@ -172,7 +179,6 @@ defmodule Elixirc do
           {:error, _} ->
             {nick, ["400 #{nick}!<user>@<hostname> :Unknown error for NAMES"], "elixIRC"}
         end  
-      "FAIL" -> 1 + []
       "PASS" ->
         Logger.info("Received PASS from Client - Ignoring for now")
         {nick, [], "elixIRC"}
