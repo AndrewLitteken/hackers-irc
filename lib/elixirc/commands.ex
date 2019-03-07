@@ -311,9 +311,14 @@ defmodule Elixirc.Commands do
             end
         end
       _ ->
-        [{_, pid}] = Registry.lookup(Registry.Connections, target)
-        send pid, message
-        {:ok, nil}
+        user_lookup = Registry.lookup(Registry.Connections, target)
+        case user_lookup do
+          [{_, pid}] ->
+            send pid, message
+            {:ok, nil}
+          [] ->
+            {nick, ["403 #{nick} #{target} :No such nick"], "elixIRC"}
+        end
     end
     case return do
       {:ok, _} ->
