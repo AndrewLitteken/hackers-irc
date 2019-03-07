@@ -70,7 +70,7 @@ defmodule Elixirc.Commands do
           _ ->
             owner = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channel}}, :owner)
             modes = Elixirc.ChannelState.get({:via, Registry, {Registry.ChannelState, channel}}, :modes)
-            if owner == nick or MapSet.member?(modes, "t") do
+            if owner == nick or not MapSet.member?(modes, "t") do
               Elixirc.ChannelState.put({:via, Registry, {Registry.ChannelState, channel}}, :topic, topic)
               {:ok, "332 #{nick} #{channel} :#{topic}"}
             else
